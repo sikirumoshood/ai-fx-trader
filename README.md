@@ -335,6 +335,14 @@ POST /signals/analyze
 
 Primary: **Kronos-base** (`NeoQuasar/Kronos-base`) — 102M params, pretrained on 12B K-line records from 45 exchanges.
 
+### Vendored Kronos Snapshot
+
+`vendor/Kronos` is intentionally committed as an internal snapshot (regular files), not a git submodule.
+
+- This keeps the repository self-contained for cloning, CI, and deployments.
+- The nested git metadata (`vendor/Kronos/.git`) is intentionally removed.
+- To update Kronos, pull/copy changes into `vendor/Kronos` and commit the file diffs in this repo.
+
 Fallback order if backtest results are poor:
 1. Tune thresholds (warm rerun — seconds)
 2. Fine-tune Kronos on FX data
