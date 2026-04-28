@@ -1,0 +1,238 @@
+2026-04-28 13:07:49,698 | INFO | schedule.execution | Schedule execution audit logger ready (file: /Users/moshoodsikiru/Documents/ai-fx-trader/logs/schedule-execution.log)
+2026-04-28 13:09:46,890 | INFO | schedule.execution | Schedule execution audit logger ready (file: /Users/moshoodsikiru/Documents/ai-fx-trader/logs/schedule-execution.log)
+2026-04-28 13:15:00,004 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T12:15:00.004412+00:00
+2026-04-28 13:15:00,146 | INFO | schedule.execution | run.start schedule_id=sch_f733a9b7f1 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T12:15:00.146244+00:00
+2026-04-28 13:15:20,101 | INFO | schedule.execution | run.end schedule_id=sch_f733a9b7f1 status=SKIPPED duration_ms=14741 signal_id=- detail=Predicted move -6.5 pips below minimum 15.0
+2026-04-28 13:15:20,116 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=19894 signal_id=- detail=Predicted move -2.8 pips below minimum 5.0
+2026-04-28 13:19:15,018 | INFO | schedule.execution | Schedule execution audit logger ready (file: /Users/moshoodsikiru/Documents/ai-fx-trader/logs/schedule-execution.log)
+2026-04-28 13:20:00,002 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T12:20:00.002448+00:00
+2026-04-28 13:20:13,970 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=13934 signal_id=- detail=Predicted move 0.6 pips below minimum 5.0
+2026-04-28 13:21:06,878 | INFO | schedule.execution | Schedule execution audit logger ready (file: /Users/moshoodsikiru/Documents/ai-fx-trader/logs/schedule-execution.log)
+2026-04-28 13:22:31,612 | INFO | schedule.execution | Schedule execution audit logger ready (file: /Users/moshoodsikiru/Documents/ai-fx-trader/logs/schedule-execution.log)
+2026-04-28 13:25:00,002 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T12:25:00.002718+00:00
+2026-04-28 13:25:07,555 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SUCCESS duration_ms=7513 signal_id=sig_570574db82 detail=EURUSD H1 SELL
+2026-04-28 13:30:00,000 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T12:30:00.000929+00:00
+2026-04-28 13:30:00,185 | INFO | schedule.execution | run.start schedule_id=sch_f733a9b7f1 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T12:30:00.185003+00:00
+2026-04-28 13:30:06,102 | INFO | schedule.execution | run.end schedule_id=sch_f733a9b7f1 status=SKIPPED duration_ms=5891 signal_id=- detail=Predicted move magnitude 3.5 pips below minimum 15.0
+2026-04-28 13:30:11,092 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=11034 signal_id=- detail=Predicted move magnitude 3.5 pips below minimum 5.0
+2026-04-28 13:35:00,003 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T12:35:00.002711+00:00
+2026-04-28 13:35:08,791 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SUCCESS duration_ms=8754 signal_id=sig_d37256f7ba detail=EURUSD H1 BUY
+2026-04-28 13:36:54,847 | INFO | schedule.execution | Schedule execution audit logger ready (file: /Users/moshoodsikiru/Documents/ai-fx-trader/logs/schedule-execution.log)
+2026-04-28 13:40:00,005 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T12:40:00.005836+00:00
+2026-04-28 13:40:16,693 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=16659 signal_id=- detail=Predicted move magnitude 4.1 pips below minimum 5.0
+2026-04-28 13:45:00,003 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T12:45:00.003370+00:00
+2026-04-28 13:45:00,128 | INFO | schedule.execution | run.start schedule_id=sch_f733a9b7f1 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T12:45:00.128617+00:00
+2026-04-28 13:45:13,675 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=7746 signal_id=- detail=Predicted move magnitude 0.7 pips below minimum 5.0
+2026-04-28 13:45:13,723 | INFO | schedule.execution | run.end schedule_id=sch_f733a9b7f1 status=SKIPPED duration_ms=13366 signal_id=- detail=Predicted move magnitude 0.7 pips below minimum 15.0
+2026-04-28 13:50:00,006 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T12:50:00.006838+00:00
+2026-04-28 13:50:07,150 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SUCCESS duration_ms=7127 signal_id=sig_34b69b2a8d detail=EURUSD H1 SELL
+2026-04-28 13:55:00,005 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T12:55:00.005160+00:00
+2026-04-28 13:55:06,558 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=6538 signal_id=- detail=Predicted move magnitude 1.2 pips below minimum 5.0
+2026-04-28 14:00:00,002 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T13:00:00.002510+00:00
+2026-04-28 14:00:00,132 | INFO | schedule.execution | run.start schedule_id=sch_f733a9b7f1 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T13:00:00.132912+00:00
+2026-04-28 14:00:11,769 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=11750 signal_id=- detail=Predicted move magnitude 3.8 pips below minimum 5.0
+2026-04-28 14:00:11,791 | INFO | schedule.execution | run.end schedule_id=sch_f733a9b7f1 status=SKIPPED duration_ms=6252 signal_id=- detail=Predicted move magnitude 1.1 pips below minimum 15.0
+2026-04-28 14:05:00,010 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T13:05:00.010809+00:00
+2026-04-28 14:05:07,323 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SUCCESS duration_ms=7300 signal_id=sig_1c0250ab80 detail=EURUSD H1 BUY
+2026-04-28 14:10:00,004 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T13:10:00.004739+00:00
+2026-04-28 14:10:06,563 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SUCCESS duration_ms=6545 signal_id=sig_f35ccd5af5 detail=EURUSD H1 BUY
+2026-04-28 14:15:00,004 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T13:15:00.004436+00:00
+2026-04-28 14:15:00,139 | INFO | schedule.execution | run.start schedule_id=sch_f733a9b7f1 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T13:15:00.139901+00:00
+2026-04-28 14:15:11,590 | INFO | schedule.execution | run.end schedule_id=sch_f733a9b7f1 status=SKIPPED duration_ms=6159 signal_id=- detail=Predicted move magnitude 3.3 pips below minimum 15.0
+2026-04-28 14:15:12,521 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SUCCESS duration_ms=12495 signal_id=sig_4d15ee827c detail=EURUSD H1 BUY
+2026-04-28 14:20:00,006 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T13:20:00.005992+00:00
+2026-04-28 14:20:05,975 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=5952 signal_id=- detail=Predicted move magnitude 2.1 pips below minimum 5.0
+2026-04-28 14:25:00,004 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T13:25:00.004743+00:00
+2026-04-28 14:25:07,321 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SUCCESS duration_ms=7280 signal_id=sig_36e1f409b9 detail=EURUSD H1 BUY
+2026-04-28 14:30:00,002 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T13:30:00.002543+00:00
+2026-04-28 14:30:00,184 | INFO | schedule.execution | run.start schedule_id=sch_f733a9b7f1 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T13:30:00.184015+00:00
+2026-04-28 14:30:12,007 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=6404 signal_id=- detail=Predicted move magnitude 2.8 pips below minimum 5.0
+2026-04-28 14:30:12,008 | INFO | schedule.execution | run.end schedule_id=sch_f733a9b7f1 status=SKIPPED duration_ms=11806 signal_id=- detail=Predicted move magnitude 2.8 pips below minimum 15.0
+2026-04-28 14:35:00,027 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T13:35:00.026332+00:00
+2026-04-28 14:35:07,996 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=7930 signal_id=- detail=Predicted move magnitude 3.4 pips below minimum 5.0
+2026-04-28 14:40:00,005 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T13:40:00.005794+00:00
+2026-04-28 14:40:07,122 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SUCCESS duration_ms=7099 signal_id=sig_45c6498dc9 detail=EURUSD H1 BUY
+2026-04-28 14:45:00,006 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T13:45:00.005989+00:00
+2026-04-28 14:45:00,132 | INFO | schedule.execution | run.start schedule_id=sch_f733a9b7f1 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T13:45:00.132359+00:00
+2026-04-28 14:45:11,816 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=6473 signal_id=- detail=Predicted move magnitude 3.5 pips below minimum 5.0
+2026-04-28 14:45:11,817 | INFO | schedule.execution | run.end schedule_id=sch_f733a9b7f1 status=SKIPPED duration_ms=11666 signal_id=- detail=Predicted move magnitude 7.7 pips below minimum 15.0
+2026-04-28 14:50:00,001 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T13:50:00.001318+00:00
+2026-04-28 14:50:07,289 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SUCCESS duration_ms=7276 signal_id=sig_a53a9db8b2 detail=EURUSD H1 SELL
+2026-04-28 14:55:00,007 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T13:55:00.007430+00:00
+2026-04-28 14:55:06,729 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SUCCESS duration_ms=6706 signal_id=sig_6422d448ef detail=EURUSD H1 SELL
+2026-04-28 15:00:00,002 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T14:00:00.002623+00:00
+2026-04-28 15:00:00,136 | INFO | schedule.execution | run.start schedule_id=sch_f733a9b7f1 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T14:00:00.136122+00:00
+2026-04-28 15:00:04,554 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=4536 signal_id=- detail=Predicted move magnitude 4.2 pips below minimum 5.0
+2026-04-28 15:00:08,463 | INFO | schedule.execution | run.end schedule_id=sch_f733a9b7f1 status=SKIPPED duration_ms=8252 signal_id=- detail=Predicted move magnitude 1.4 pips below minimum 15.0
+2026-04-28 15:05:00,002 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T14:05:00.002482+00:00
+2026-04-28 15:05:06,998 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=6976 signal_id=- detail=Predicted move magnitude 3.4 pips below minimum 5.0
+2026-04-28 15:10:00,006 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T14:10:00.005643+00:00
+2026-04-28 15:10:06,503 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=6478 signal_id=- detail=Predicted move magnitude 0.2 pips below minimum 5.0
+2026-04-28 15:15:00,009 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T14:15:00.009331+00:00
+2026-04-28 15:15:00,284 | INFO | schedule.execution | run.start schedule_id=sch_f733a9b7f1 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T14:15:00.284907+00:00
+2026-04-28 15:15:13,265 | INFO | schedule.execution | run.end schedule_id=sch_f733a9b7f1 status=SKIPPED duration_ms=7729 signal_id=- detail=Predicted move magnitude 7.7 pips below minimum 15.0
+2026-04-28 15:15:14,160 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SUCCESS duration_ms=14133 signal_id=sig_410255d7c1 detail=EURUSD H1 SELL
+2026-04-28 15:20:00,005 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T14:20:00.005675+00:00
+2026-04-28 15:20:05,723 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=5695 signal_id=- detail=Predicted move magnitude 2.2 pips below minimum 5.0
+2026-04-28 15:24:37,074 | INFO | schedule.execution | Schedule execution audit logger ready (file: /Users/moshoodsikiru/Documents/ai-fx-trader/logs/schedule-execution.log)
+2026-04-28 15:25:00,001 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T14:25:00.001708+00:00
+2026-04-28 15:25:14,432 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SUCCESS duration_ms=14400 signal_id=sig_14537b0d3b detail=EURUSD H1 SELL
+2026-04-28 15:30:00,001 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T14:30:00.001224+00:00
+2026-04-28 15:30:00,186 | INFO | schedule.execution | run.start schedule_id=sch_f733a9b7f1 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T14:30:00.185996+00:00
+2026-04-28 15:30:09,187 | INFO | schedule.execution | run.end schedule_id=sch_f733a9b7f1 status=SKIPPED duration_ms=8939 signal_id=- detail=Predicted move magnitude 2.8 pips below minimum 15.0
+2026-04-28 15:30:09,192 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=5450 signal_id=- detail=Predicted move magnitude 3.2 pips below minimum 5.0
+2026-04-28 15:35:00,001 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T14:35:00.001831+00:00
+2026-04-28 15:35:05,509 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=5486 signal_id=- detail=Predicted move magnitude 3.0 pips below minimum 5.0
+2026-04-28 15:40:00,003 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T14:40:00.003321+00:00
+2026-04-28 15:40:06,205 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=6175 signal_id=- detail=Predicted move magnitude 4.1 pips below minimum 5.0
+2026-04-28 15:45:00,010 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T14:45:00.010186+00:00
+2026-04-28 15:45:00,199 | INFO | schedule.execution | run.start schedule_id=sch_f733a9b7f1 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T14:45:00.199530+00:00
+2026-04-28 15:45:09,668 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=9643 signal_id=- detail=Predicted move magnitude 4.3 pips below minimum 5.0
+2026-04-28 15:45:09,668 | INFO | schedule.execution | run.end schedule_id=sch_f733a9b7f1 status=SKIPPED duration_ms=5036 signal_id=- detail=Predicted move magnitude 4.3 pips below minimum 15.0
+2026-04-28 15:50:00,004 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T14:50:00.004532+00:00
+2026-04-28 15:50:07,199 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SUCCESS duration_ms=7179 signal_id=sig_d0f6038825 detail=EURUSD H1 BUY
+2026-04-28 15:55:00,002 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T14:55:00.002481+00:00
+2026-04-28 15:55:05,971 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SUCCESS duration_ms=5953 signal_id=sig_93cb74d5c4 detail=EURUSD H1 SELL
+2026-04-28 16:00:00,005 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T15:00:00.005453+00:00
+2026-04-28 16:00:00,179 | INFO | schedule.execution | run.start schedule_id=sch_f733a9b7f1 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T15:00:00.179339+00:00
+2026-04-28 16:00:23,866 | INFO | schedule.execution | run.end schedule_id=sch_f733a9b7f1 status=SKIPPED duration_ms=11627 signal_id=- detail=Predicted move magnitude 5.2 pips below minimum 15.0
+2026-04-28 16:00:25,125 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SUCCESS duration_ms=25080 signal_id=sig_7b6e2fbd98 detail=EURUSD H1 SELL
+2026-04-28 16:05:00,007 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T15:05:00.006981+00:00
+2026-04-28 16:05:14,791 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=14742 signal_id=- detail=Predicted move magnitude 2.6 pips below minimum 5.0
+2026-04-28 16:10:00,003 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T15:10:00.003146+00:00
+2026-04-28 16:10:07,768 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=7735 signal_id=- detail=Predicted move magnitude 4.5 pips below minimum 5.0
+2026-04-28 16:15:00,001 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T15:15:00.001642+00:00
+2026-04-28 16:15:00,126 | INFO | schedule.execution | run.start schedule_id=sch_f733a9b7f1 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T15:15:00.126081+00:00
+2026-04-28 16:15:10,414 | INFO | schedule.execution | run.end schedule_id=sch_f733a9b7f1 status=SKIPPED duration_ms=5130 signal_id=- detail=Predicted move magnitude 2.0 pips below minimum 15.0
+2026-04-28 16:15:10,416 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=10399 signal_id=- detail=Predicted move magnitude 2.0 pips below minimum 5.0
+2026-04-28 16:20:00,002 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T15:20:00.002484+00:00
+2026-04-28 16:20:06,496 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=6414 signal_id=- detail=Predicted move magnitude 1.7 pips below minimum 5.0
+2026-04-28 16:25:00,003 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T15:25:00.003847+00:00
+2026-04-28 16:25:09,058 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=8962 signal_id=- detail=Predicted move magnitude 3.6 pips below minimum 5.0
+2026-04-28 16:30:00,005 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T15:30:00.005429+00:00
+2026-04-28 16:30:00,145 | INFO | schedule.execution | run.start schedule_id=sch_f733a9b7f1 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T15:30:00.145616+00:00
+2026-04-28 16:30:14,751 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=7425 signal_id=- detail=Predicted move magnitude 2.4 pips below minimum 5.0
+2026-04-28 16:30:14,753 | INFO | schedule.execution | run.end schedule_id=sch_f733a9b7f1 status=SKIPPED duration_ms=14582 signal_id=- detail=Predicted move magnitude 2.6 pips below minimum 15.0
+2026-04-28 16:35:00,003 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T15:35:00.003485+00:00
+2026-04-28 16:35:08,998 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=8975 signal_id=- detail=Predicted move magnitude 1.6 pips below minimum 5.0
+2026-04-28 16:40:00,005 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T15:40:00.005586+00:00
+2026-04-28 16:40:06,832 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=6807 signal_id=- detail=Predicted move magnitude 1.7 pips below minimum 5.0
+2026-04-28 16:45:00,003 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T15:45:00.003911+00:00
+2026-04-28 16:45:00,140 | INFO | schedule.execution | run.start schedule_id=sch_f733a9b7f1 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T15:45:00.140796+00:00
+2026-04-28 16:45:16,312 | INFO | schedule.execution | run.end schedule_id=sch_f733a9b7f1 status=SKIPPED duration_ms=7770 signal_id=- detail=Predicted move magnitude 0.5 pips below minimum 15.0
+2026-04-28 16:45:16,314 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=16270 signal_id=- detail=Predicted move magnitude 0.5 pips below minimum 5.0
+2026-04-28 16:50:00,005 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T15:50:00.005942+00:00
+2026-04-28 16:50:06,289 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=6263 signal_id=- detail=Predicted move magnitude 2.9 pips below minimum 5.0
+2026-04-28 16:55:00,006 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T15:55:00.006247+00:00
+2026-04-28 16:55:07,826 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=7794 signal_id=- detail=Predicted move magnitude 0.5 pips below minimum 5.0
+2026-04-28 17:00:00,000 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T16:00:00.000903+00:00
+2026-04-28 17:00:00,135 | INFO | schedule.execution | run.start schedule_id=sch_f733a9b7f1 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T16:00:00.135970+00:00
+2026-04-28 17:00:08,020 | INFO | schedule.execution | run.end schedule_id=sch_f733a9b7f1 status=SKIPPED duration_ms=7860 signal_id=- detail=Predicted move magnitude 2.4 pips below minimum 15.0
+2026-04-28 17:00:16,671 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=16649 signal_id=- detail=Predicted move magnitude 0.7 pips below minimum 5.0
+2026-04-28 17:05:00,701 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T16:05:00.701040+00:00
+2026-04-28 17:05:00,969 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=252 signal_id=- detail=Outside active trading sessions
+2026-04-28 17:10:00,002 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T16:10:00.002412+00:00
+2026-04-28 17:10:00,365 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=350 signal_id=- detail=Outside active trading sessions
+2026-04-28 17:15:00,006 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T16:15:00.006141+00:00
+2026-04-28 17:15:00,135 | INFO | schedule.execution | run.start schedule_id=sch_f733a9b7f1 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T16:15:00.135136+00:00
+2026-04-28 17:15:00,736 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=709 signal_id=- detail=Outside active trading sessions
+2026-04-28 17:15:00,740 | INFO | schedule.execution | run.end schedule_id=sch_f733a9b7f1 status=SKIPPED duration_ms=588 signal_id=- detail=Outside active trading sessions
+2026-04-28 17:20:02,632 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T16:20:02.632344+00:00
+2026-04-28 17:20:02,771 | INFO | schedule.execution | run.start schedule_id=sch_af1f45669e pair=EURUSD timeframe=H1 cron_tick=2026-04-28T16:20:02.771226+00:00
+2026-04-28 17:20:11,144 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=521 signal_id=- detail=Outside active trading sessions
+2026-04-28 17:20:11,222 | INFO | schedule.execution | run.end schedule_id=sch_af1f45669e status=SKIPPED duration_ms=8254 signal_id=- detail=Predicted move magnitude 2.0 pips below minimum 3.0
+2026-04-28 17:25:00,006 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T16:25:00.006789+00:00
+2026-04-28 17:25:00,135 | INFO | schedule.execution | run.start schedule_id=sch_af1f45669e pair=EURUSD timeframe=H1 cron_tick=2026-04-28T16:25:00.135943+00:00
+2026-04-28 17:25:00,814 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=794 signal_id=- detail=Outside active trading sessions
+2026-04-28 17:25:07,383 | INFO | schedule.execution | run.end schedule_id=sch_af1f45669e status=SUCCESS duration_ms=7218 signal_id=sig_d276aa575c detail=EURUSD H1 BUY
+2026-04-28 17:30:00,001 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T16:30:00.001303+00:00
+2026-04-28 17:30:00,129 | INFO | schedule.execution | run.start schedule_id=sch_af1f45669e pair=EURUSD timeframe=H1 cron_tick=2026-04-28T16:30:00.129121+00:00
+2026-04-28 17:30:00,257 | INFO | schedule.execution | run.start schedule_id=sch_f733a9b7f1 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T16:30:00.257835+00:00
+2026-04-28 17:30:00,702 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=689 signal_id=- detail=Outside active trading sessions
+2026-04-28 17:30:00,751 | INFO | schedule.execution | run.end schedule_id=sch_f733a9b7f1 status=SKIPPED duration_ms=482 signal_id=- detail=Outside active trading sessions
+2026-04-28 17:30:06,473 | INFO | schedule.execution | run.end schedule_id=sch_af1f45669e status=SUCCESS duration_ms=6328 signal_id=sig_37961ea8ff detail=EURUSD H1 BUY
+2026-04-28 17:35:00,002 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T16:35:00.002934+00:00
+2026-04-28 17:35:00,131 | INFO | schedule.execution | run.start schedule_id=sch_af1f45669e pair=EURUSD timeframe=H1 cron_tick=2026-04-28T16:35:00.131494+00:00
+2026-04-28 17:35:00,595 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=580 signal_id=- detail=Outside active trading sessions
+2026-04-28 17:35:06,706 | INFO | schedule.execution | run.end schedule_id=sch_af1f45669e status=SUCCESS duration_ms=6561 signal_id=sig_8fa1c70127 detail=EURUSD H1 BUY
+2026-04-28 17:40:00,005 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T16:40:00.005599+00:00
+2026-04-28 17:40:00,186 | INFO | schedule.execution | run.start schedule_id=sch_af1f45669e pair=EURUSD timeframe=H1 cron_tick=2026-04-28T16:40:00.186954+00:00
+2026-04-28 17:40:05,453 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=5414 signal_id=- detail=Outside active trading sessions
+2026-04-28 17:40:06,260 | INFO | schedule.execution | run.end schedule_id=sch_af1f45669e status=SUCCESS duration_ms=6062 signal_id=sig_47d5d680fd detail=EURUSD H1 BUY
+2026-04-28 17:45:00,000 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T16:45:00.000699+00:00
+2026-04-28 17:45:00,127 | INFO | schedule.execution | run.start schedule_id=sch_af1f45669e pair=EURUSD timeframe=H1 cron_tick=2026-04-28T16:45:00.127437+00:00
+2026-04-28 17:45:00,247 | INFO | schedule.execution | run.start schedule_id=sch_f733a9b7f1 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T16:45:00.247379+00:00
+2026-04-28 17:45:00,654 | INFO | schedule.execution | run.end schedule_id=sch_f733a9b7f1 status=SKIPPED duration_ms=395 signal_id=- detail=Outside active trading sessions
+2026-04-28 17:45:05,960 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=5915 signal_id=- detail=Outside active trading sessions
+2026-04-28 17:45:06,786 | INFO | schedule.execution | run.end schedule_id=sch_af1f45669e status=SUCCESS duration_ms=6645 signal_id=sig_451fcf32b6 detail=EURUSD H1 BUY
+2026-04-28 17:50:00,001 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T16:50:00.001158+00:00
+2026-04-28 17:50:00,138 | INFO | schedule.execution | run.start schedule_id=sch_af1f45669e pair=EURUSD timeframe=H1 cron_tick=2026-04-28T16:50:00.138460+00:00
+2026-04-28 17:50:09,018 | INFO | schedule.execution | run.end schedule_id=sch_af1f45669e status=SKIPPED duration_ms=8830 signal_id=- detail=Predicted move magnitude 2.6 pips below minimum 3.0
+2026-04-28 17:50:09,477 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=9439 signal_id=- detail=Outside active trading sessions
+2026-04-28 17:55:00,005 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T16:55:00.005682+00:00
+2026-04-28 17:55:00,139 | INFO | schedule.execution | run.start schedule_id=sch_af1f45669e pair=EURUSD timeframe=H1 cron_tick=2026-04-28T16:55:00.139966+00:00
+2026-04-28 17:55:00,812 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=789 signal_id=- detail=Outside active trading sessions
+2026-04-28 17:55:16,788 | INFO | schedule.execution | run.end schedule_id=sch_af1f45669e status=SUCCESS duration_ms=16608 signal_id=sig_c57f21998d detail=EURUSD H1 BUY
+2026-04-28 18:00:00,001 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T17:00:00.001425+00:00
+2026-04-28 18:00:00,137 | INFO | schedule.execution | run.start schedule_id=sch_af1f45669e pair=EURUSD timeframe=H1 cron_tick=2026-04-28T17:00:00.137508+00:00
+2026-04-28 18:00:00,270 | INFO | schedule.execution | run.start schedule_id=sch_f733a9b7f1 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T17:00:00.270532+00:00
+2026-04-28 18:00:07,512 | INFO | schedule.execution | run.end schedule_id=sch_af1f45669e status=SKIPPED duration_ms=7338 signal_id=- detail=Predicted move magnitude 0.5 pips below minimum 3.0
+2026-04-28 18:00:07,513 | INFO | schedule.execution | run.end schedule_id=sch_f733a9b7f1 status=SKIPPED duration_ms=7218 signal_id=- detail=Outside active trading sessions
+2026-04-28 18:00:07,691 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=7674 signal_id=- detail=Outside active trading sessions
+2026-04-28 18:05:00,006 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T17:05:00.006122+00:00
+2026-04-28 18:05:00,130 | INFO | schedule.execution | run.start schedule_id=sch_af1f45669e pair=EURUSD timeframe=H1 cron_tick=2026-04-28T17:05:00.129984+00:00
+2026-04-28 18:05:05,536 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=562 signal_id=- detail=Outside active trading sessions
+2026-04-28 18:05:05,555 | INFO | schedule.execution | run.end schedule_id=sch_af1f45669e status=SKIPPED duration_ms=5222 signal_id=- detail=Predicted move magnitude 1.7 pips below minimum 3.0
+2026-04-28 18:10:00,061 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T17:10:00.061372+00:00
+2026-04-28 18:10:00,292 | INFO | schedule.execution | run.start schedule_id=sch_af1f45669e pair=EURUSD timeframe=H1 cron_tick=2026-04-28T17:10:00.292508+00:00
+2026-04-28 18:10:08,384 | INFO | schedule.execution | run.end schedule_id=sch_af1f45669e status=SKIPPED duration_ms=8057 signal_id=- detail=Predicted move magnitude 1.2 pips below minimum 3.0
+2026-04-28 18:10:08,816 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=8731 signal_id=- detail=Outside active trading sessions
+2026-04-28 18:15:00,006 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T17:15:00.006160+00:00
+2026-04-28 18:15:00,228 | INFO | schedule.execution | run.start schedule_id=sch_af1f45669e pair=EURUSD timeframe=H1 cron_tick=2026-04-28T17:15:00.228859+00:00
+2026-04-28 18:15:00,373 | INFO | schedule.execution | run.start schedule_id=sch_f733a9b7f1 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T17:15:00.373209+00:00
+2026-04-28 18:15:09,237 | INFO | schedule.execution | run.end schedule_id=sch_af1f45669e status=SKIPPED duration_ms=8978 signal_id=- detail=Predicted move magnitude 2.7 pips below minimum 3.0
+2026-04-28 18:15:09,351 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=9326 signal_id=- detail=Outside active trading sessions
+2026-04-28 18:15:09,701 | INFO | schedule.execution | run.end schedule_id=sch_f733a9b7f1 status=SKIPPED duration_ms=9309 signal_id=- detail=Outside active trading sessions
+2026-04-28 18:17:17,165 | INFO | schedule.execution | Schedule execution audit logger ready (file: /Users/moshoodsikiru/Documents/ai-fx-trader/logs/schedule-execution.log)
+2026-04-28 18:20:00,013 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T17:20:00.013382+00:00
+2026-04-28 18:20:00,200 | INFO | schedule.execution | run.start schedule_id=sch_af1f45669e pair=EURUSD timeframe=H1 cron_tick=2026-04-28T17:20:00.200587+00:00
+2026-04-28 18:20:16,480 | INFO | schedule.execution | run.end schedule_id=sch_af1f45669e status=SKIPPED duration_ms=16235 signal_id=- detail=Predicted move magnitude 2.6 pips below minimum 3.0
+2026-04-28 18:20:16,481 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=666 signal_id=- detail=Outside active trading sessions
+2026-04-28 18:25:00,087 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T17:25:00.084404+00:00
+2026-04-28 18:25:00,441 | INFO | schedule.execution | run.start schedule_id=sch_af1f45669e pair=EURUSD timeframe=H1 cron_tick=2026-04-28T17:25:00.441817+00:00
+2026-04-28 18:25:01,025 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=887 signal_id=- detail=Outside active trading sessions
+2026-04-28 18:25:10,159 | INFO | schedule.execution | run.end schedule_id=sch_af1f45669e status=SUCCESS duration_ms=9700 signal_id=sig_99786cc547 detail=EURUSD H1 SELL
+2026-04-28 18:30:00,008 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T17:30:00.008881+00:00
+2026-04-28 18:30:00,234 | INFO | schedule.execution | run.start schedule_id=sch_af1f45669e pair=EURUSD timeframe=H1 cron_tick=2026-04-28T17:30:00.234425+00:00
+2026-04-28 18:30:00,429 | INFO | schedule.execution | run.start schedule_id=sch_f733a9b7f1 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T17:30:00.429436+00:00
+2026-04-28 18:30:09,129 | INFO | schedule.execution | run.end schedule_id=sch_af1f45669e status=SKIPPED duration_ms=8740 signal_id=- detail=Predicted move magnitude 0.0 pips below minimum 3.0
+2026-04-28 18:30:09,129 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=1238 signal_id=- detail=Outside active trading sessions
+2026-04-28 18:30:09,258 | INFO | schedule.execution | run.end schedule_id=sch_f733a9b7f1 status=SKIPPED duration_ms=8551 signal_id=- detail=Outside active trading sessions
+2026-04-28 18:35:00,011 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T17:35:00.011427+00:00
+2026-04-28 18:35:00,147 | INFO | schedule.execution | run.start schedule_id=sch_af1f45669e pair=EURUSD timeframe=H1 cron_tick=2026-04-28T17:35:00.147161+00:00
+2026-04-28 18:35:00,654 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=620 signal_id=- detail=Outside active trading sessions
+2026-04-28 18:35:08,866 | INFO | schedule.execution | run.end schedule_id=sch_af1f45669e status=SUCCESS duration_ms=8701 signal_id=sig_e548483b2f detail=EURUSD H1 SELL
+2026-04-28 18:40:00,007 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T17:40:00.007052+00:00
+2026-04-28 18:40:00,194 | INFO | schedule.execution | run.start schedule_id=sch_af1f45669e pair=EURUSD timeframe=H1 cron_tick=2026-04-28T17:40:00.194758+00:00
+2026-04-28 18:40:08,068 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=8015 signal_id=- detail=Outside active trading sessions
+2026-04-28 18:40:09,057 | INFO | schedule.execution | run.end schedule_id=sch_af1f45669e status=SUCCESS duration_ms=8845 signal_id=sig_b1e9c29868 detail=EURUSD H1 SELL
+2026-04-28 18:45:00,001 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T17:45:00.001596+00:00
+2026-04-28 18:45:00,148 | INFO | schedule.execution | run.start schedule_id=sch_af1f45669e pair=EURUSD timeframe=H1 cron_tick=2026-04-28T17:45:00.147995+00:00
+2026-04-28 18:45:00,333 | INFO | schedule.execution | run.start schedule_id=sch_f733a9b7f1 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T17:45:00.333131+00:00
+2026-04-28 18:45:00,742 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=726 signal_id=- detail=Outside active trading sessions
+2026-04-28 18:45:01,086 | INFO | schedule.execution | run.end schedule_id=sch_f733a9b7f1 status=SKIPPED duration_ms=739 signal_id=- detail=Outside active trading sessions
+2026-04-28 18:45:05,948 | INFO | schedule.execution | run.end schedule_id=sch_af1f45669e status=SKIPPED duration_ms=5729 signal_id=- detail=Predicted move magnitude 0.1 pips below minimum 3.0
+2026-04-28 18:50:00,012 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T17:50:00.012875+00:00
+2026-04-28 18:50:00,142 | INFO | schedule.execution | run.start schedule_id=sch_af1f45669e pair=EURUSD timeframe=H1 cron_tick=2026-04-28T17:50:00.142646+00:00
+2026-04-28 18:50:00,635 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=607 signal_id=- detail=Outside active trading sessions
+2026-04-28 18:50:05,742 | INFO | schedule.execution | run.end schedule_id=sch_af1f45669e status=SKIPPED duration_ms=5583 signal_id=- detail=Predicted move magnitude 2.3 pips below minimum 3.0
+2026-04-28 18:55:00,010 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T17:55:00.010522+00:00
+2026-04-28 18:55:00,199 | INFO | schedule.execution | run.start schedule_id=sch_af1f45669e pair=EURUSD timeframe=H1 cron_tick=2026-04-28T17:55:00.199569+00:00
+2026-04-28 18:55:00,640 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=607 signal_id=- detail=Outside active trading sessions
+2026-04-28 18:55:05,585 | INFO | schedule.execution | run.end schedule_id=sch_af1f45669e status=SKIPPED duration_ms=5364 signal_id=- detail=Predicted move magnitude 0.4 pips below minimum 3.0
+2026-04-28 19:00:00,008 | INFO | schedule.execution | run.start schedule_id=sch_6cd5896b93 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T18:00:00.008976+00:00
+2026-04-28 19:00:00,138 | INFO | schedule.execution | run.start schedule_id=sch_af1f45669e pair=EURUSD timeframe=H1 cron_tick=2026-04-28T18:00:00.138558+00:00
+2026-04-28 19:00:00,260 | INFO | schedule.execution | run.start schedule_id=sch_f733a9b7f1 pair=EURUSD timeframe=H1 cron_tick=2026-04-28T18:00:00.260671+00:00
+2026-04-28 19:00:05,541 | INFO | schedule.execution | run.end schedule_id=sch_af1f45669e status=SKIPPED duration_ms=5387 signal_id=- detail=Predicted move magnitude 1.5 pips below minimum 3.0
+2026-04-28 19:00:05,543 | INFO | schedule.execution | run.end schedule_id=sch_6cd5896b93 status=SKIPPED duration_ms=670 signal_id=- detail=Outside active trading sessions
+2026-04-28 19:00:05,543 | INFO | schedule.execution | run.end schedule_id=sch_f733a9b7f1 status=SKIPPED duration_ms=420 signal_id=- detail=Outside active trading sessions

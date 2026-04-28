@@ -1,0 +1,65 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fx}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fx}
+      POSTGRES_DB: ${POSTGRES_DB:-fxtrader}
+    ports:
+      - "5438:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fx} -d ${POSTGRES_DB:-fxtrader}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  mt5:
+    image: gmag11/metatrader5_vnc:latest
+    restart: unless-stopped
+    ports:
+      - "8001:8001"   # RPyC — pymt5linux connects here
+      - "5901:3000"   # KasmVNC web UI — open http://localhost:5901 to log into MT5
+    volumes:
+      - mt5_data:/config   # persists MT5 session & broker login across restarts
+    environment:
+      - CUSTOM_USER=${MT5_VNC_USER:-admin}
+      - PASSWORD=${MT5_VNC_PASSWORD:-admin}
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - MT5_HOST=mt5   # inside Docker, reach MT5 container by service name
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      - model_cache:/root/.cache/huggingface
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    env_file:
+      - ./frontend/.env.local
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:
+  model_cache:
+  mt5_data:
