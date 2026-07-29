@@ -28,18 +28,18 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl font-semibold">Dashboard</h1>
         <AnalyzeForm />
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map(({ label, value, icon: Icon, color }) => (
           <Card key={label}>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="text-muted-foreground">{label}</CardTitle>
-                <Icon className={`w-4 h-4 ${color}`} />
+                <Icon className={`h-4 w-4 ${color}`} />
               </div>
             </CardHeader>
             <CardContent>

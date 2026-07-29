@@ -15,6 +15,7 @@ MT5_BRIDGE_FILES = os.path.expanduser(os.getenv(
     "~/Library/Application Support/net.metaquotes.wine.metatrader5"
     "/drive_c/users/user/AppData/Roaming/MetaQuotes/Terminal/Common/Files",
 ))  # Shared folder between MT5 EA and Python (FILE_COMMON in MQL5)
+MT5_BROKER_UTC_OFFSET_HOURS = os.getenv("MT5_BROKER_UTC_OFFSET_HOURS", "auto")
 
 # ── Kronos model ─────────────────────────────────────────────────────────────
 MODEL_NAME      = os.getenv("MODEL_NAME", "kronos")          # kronos | moirai | tft
@@ -35,6 +36,11 @@ DEFAULT_RISK_PERCENT   = float(os.getenv("DEFAULT_RISK_PERCENT", "1.0"))
 DEFAULT_MAX_SPREAD     = float(os.getenv("DEFAULT_MAX_SPREAD", "3.0"))   # pips
 SIGNAL_EXPIRY_SECONDS  = int(os.getenv("SIGNAL_EXPIRY_SECONDS", "300"))  # 5 minutes
 CONFIDENCE_THRESHOLD   = float(os.getenv("CONFIDENCE_THRESHOLD", "0.62"))
+TREND_FILTER_ENABLED   = os.getenv("TREND_FILTER_ENABLED", "true").lower() == "true"
+TREND_LOOKBACK_CANDLES = int(os.getenv("TREND_LOOKBACK_CANDLES", "3"))
+TREND_FAST_EMA         = int(os.getenv("TREND_FAST_EMA", "9"))
+TREND_SLOW_EMA         = int(os.getenv("TREND_SLOW_EMA", "21"))
+TREND_MIN_MOMENTUM_PIPS = float(os.getenv("TREND_MIN_MOMENTUM_PIPS", "3.0"))
 
 # ── Trading sessions (UTC) ────────────────────────────────────────────────────
 SESSION_FILTERS = {

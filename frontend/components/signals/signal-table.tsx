@@ -26,7 +26,7 @@ export function SignalTable({ signals }: { signals: Signal[] }) {
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+      <table className="w-full min-w-[880px] text-sm">
         <thead>
           <tr className="border-b border-border text-muted-foreground text-xs">
             <th className="text-left py-2 px-3">Pair</th>

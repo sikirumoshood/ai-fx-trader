@@ -20,7 +20,7 @@ export default function BacktestPage() {
     <div className="space-y-6">
       <h1 className="text-xl font-semibold">Backtest</h1>
 
-      <div className="grid grid-cols-[280px_1fr] gap-6 items-start">
+      <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start">
         {/* Left column: history list + form */}
         <div className="space-y-4">
           <Card>
@@ -46,7 +46,7 @@ export default function BacktestPage() {
         </div>
 
         {/* Right column: results */}
-        <Card className="min-h-[400px]">
+        <Card className="min-h-[400px] min-w-0">
           <CardHeader><CardTitle>Results</CardTitle></CardHeader>
           <CardContent>
             {selectedJobId ? (

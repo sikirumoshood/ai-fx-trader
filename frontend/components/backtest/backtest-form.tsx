@@ -38,7 +38,7 @@ export function BacktestForm({ onJobCreated }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label>Pair</Label>
           <Select value={form.pair} onChange={e => set("pair", e.target.value)}>

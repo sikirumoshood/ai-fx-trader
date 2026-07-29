@@ -1,19 +1,21 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import pandas as pd
 
 from config.settings import (
     MT5_LOGIN, MT5_PASSWORD, MT5_SERVER, MT5_PATH,
-    MT5_HOST, MT5_PORT, MT5_BRIDGE_FILES, pip_size,
+    MT5_HOST, MT5_PORT, MT5_BRIDGE_FILES, MT5_BROKER_UTC_OFFSET_HOURS,
+    pip_size,
 )
 
 # Populated by initialize() — None until a successful connection is made.
 # No connection is attempted at import time.
 _mt5 = None
 _MT5_REMOTE = False  # True when using mt5linux (Mac/Linux Docker)
+_AUTO_BROKER_UTC_OFFSET_HOURS: int | None = None
 
 
 def _is_available() -> bool:
@@ -136,7 +138,7 @@ def fetch_ohlcv(pair: str, timeframe: str, count: int = 500) -> pd.DataFrame:
     rates = _mt5.copy_rates_from_pos(pair, tf, 0, count)
     if rates is None or len(rates) == 0:
         raise RuntimeError(f"No data for {pair} {timeframe}: {_mt5.last_error()}")
-    return _to_df(rates)
+    return _to_df(rates, timeframe=timeframe)
 
 
 def fetch_ohlcv_range(
@@ -151,17 +153,99 @@ def fetch_ohlcv_range(
     tf = tf_map.get(timeframe.upper())
     if tf is None:
         raise ValueError(f"Unsupported timeframe: {timeframe}. Valid: {list(tf_map)}")
+    _ensure_auto_broker_offset(pair, tf, timeframe)
     rates = _mt5.copy_rates_range(pair, tf, start, end)
     if rates is None or len(rates) == 0:
         raise RuntimeError(f"No data for {pair} {timeframe} {start}–{end}: {_mt5.last_error()}")
-    return _to_df(rates)
+    return _to_df(rates, timeframe=timeframe)
 
 
-def _to_df(rates) -> pd.DataFrame:
+def _to_df(rates, timeframe: str | None = None) -> pd.DataFrame:
     df = pd.DataFrame(rates)
     df["time"] = pd.to_datetime(df["time"], unit="s", utc=True)
     df = df.rename(columns={"tick_volume": "volume"})
-    return df[["time", "open", "high", "low", "close", "volume", "spread"]]
+    df = df[["time", "open", "high", "low", "close", "volume", "spread"]]
+    return _normalise_broker_time(df, timeframe)
+
+
+def _normalise_broker_time(df: pd.DataFrame, timeframe: str | None) -> pd.DataFrame:
+    """Convert MT5 broker/server candle timestamps to UTC.
+
+    The AiFxBridge returns MQL5 candle timestamps as provided by the terminal.
+    Some brokers expose those in server time, which can be several hours ahead
+    of UTC. Kronos and the scheduler expect UTC, so normalise here at the data
+    boundary.
+    """
+    raw_offset = str(MT5_BROKER_UTC_OFFSET_HOURS).strip().lower()
+    offset_hours: int | None
+
+    if raw_offset in ("", "auto"):
+        global _AUTO_BROKER_UTC_OFFSET_HOURS
+        offset_hours = _infer_future_time_offset_hours(df, timeframe)
+        if offset_hours is not None:
+            _AUTO_BROKER_UTC_OFFSET_HOURS = offset_hours
+        elif _AUTO_BROKER_UTC_OFFSET_HOURS is not None:
+            offset_hours = _AUTO_BROKER_UTC_OFFSET_HOURS
+    else:
+        try:
+            offset_hours = int(float(raw_offset))
+        except ValueError:
+            offset_hours = None
+
+    if offset_hours:
+        df = df.copy()
+        df["time"] = df["time"] - pd.to_timedelta(offset_hours, unit="h")
+    return df
+
+
+def _ensure_auto_broker_offset(pair: str, tf, timeframe: str) -> None:
+    if str(MT5_BROKER_UTC_OFFSET_HOURS).strip().lower() not in ("", "auto"):
+        return
+    if _AUTO_BROKER_UTC_OFFSET_HOURS is not None:
+        return
+    try:
+        rates = _mt5.copy_rates_from_pos(pair, tf, 0, 10)
+    except Exception:
+        return
+    if rates is None or len(rates) == 0:
+        return
+    _to_df(rates, timeframe=timeframe)
+
+
+def _infer_future_time_offset_hours(
+    df: pd.DataFrame,
+    timeframe: str | None,
+    now: datetime | None = None,
+) -> int | None:
+    if df.empty or "time" not in df:
+        return None
+
+    latest = df["time"].max()
+    if hasattr(latest, "to_pydatetime"):
+        latest = latest.to_pydatetime()
+    if latest.tzinfo is None:
+        latest = latest.replace(tzinfo=timezone.utc)
+
+    now_utc = now or datetime.now(timezone.utc)
+    tolerance = max(timedelta(minutes=10), _timeframe_delta(timeframe) / 4)
+    future_skew = latest - now_utc
+    if future_skew <= tolerance:
+        return None
+
+    return max(1, int(future_skew.total_seconds() // 3600) + 1)
+
+
+def _timeframe_delta(timeframe: str | None) -> timedelta:
+    tf = (timeframe or "").upper()
+    if tf.startswith("M") and tf[1:].isdigit():
+        return timedelta(minutes=int(tf[1:]))
+    if tf.startswith("H") and tf[1:].isdigit():
+        return timedelta(hours=int(tf[1:]))
+    if tf.startswith("D") and tf[1:].isdigit():
+        return timedelta(days=int(tf[1:]))
+    if tf.startswith("W") and tf[1:].isdigit():
+        return timedelta(weeks=int(tf[1:]))
+    return timedelta(hours=1)
 
 
 # ── Symbol info ───────────────────────────────────────────────────────────────

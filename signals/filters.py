@@ -3,12 +3,20 @@ from __future__ import annotations
 from datetime import datetime, timedelta, time, timezone
 from typing import Optional
 
+import pandas as pd
+
 from config.settings import (
     SESSION_FILTERS,
     ACTIVE_SESSIONS,
     CONFIDENCE_THRESHOLD,
     DEFAULT_MAX_SPREAD,
     NEWS_BLACKOUT_MINUTES,
+    TREND_FAST_EMA,
+    TREND_FILTER_ENABLED,
+    TREND_LOOKBACK_CANDLES,
+    TREND_MIN_MOMENTUM_PIPS,
+    TREND_SLOW_EMA,
+    pip_size,
 )
 
 
@@ -120,6 +128,70 @@ def check_spread(spread_pips: float, max_spread: Optional[float] = None) -> bool
     """True if current spread is within acceptable range."""
     limit = max_spread if max_spread is not None else DEFAULT_MAX_SPREAD
     return spread_pips <= limit
+
+
+# ── Trend alignment filter ───────────────────────────────────────────────────
+
+def resolve_trend_direction(
+    candles: pd.DataFrame,
+    pair: str,
+    *,
+    lookback: int = TREND_LOOKBACK_CANDLES,
+    fast_ema: int = TREND_FAST_EMA,
+    slow_ema: int = TREND_SLOW_EMA,
+    min_momentum_pips: float = TREND_MIN_MOMENTUM_PIPS,
+) -> tuple[str | None, str]:
+    """Return the current trend direction using recent momentum, then EMAs."""
+    if candles.empty or "close" not in candles:
+        return None, "No close-price history"
+
+    closes = candles["close"].astype(float).dropna()
+    if len(closes) < max(lookback + 1, slow_ema):
+        return None, "Insufficient history for trend filter"
+
+    ps = pip_size(pair)
+    recent_move = (closes.iloc[-1] - closes.iloc[-(lookback + 1)]) / ps
+    if recent_move >= min_momentum_pips:
+        return "BUY", f"Recent momentum {recent_move:.1f} pips over {lookback} candles"
+    if recent_move <= -min_momentum_pips:
+        return "SELL", f"Recent momentum {recent_move:.1f} pips over {lookback} candles"
+
+    fast = closes.ewm(span=fast_ema, adjust=False).mean()
+    slow = closes.ewm(span=slow_ema, adjust=False).mean()
+    fast_slope_pips = (fast.iloc[-1] - fast.iloc[-2]) / ps
+
+    if fast.iloc[-1] > slow.iloc[-1] and fast_slope_pips >= 0:
+        return "BUY", (
+            f"EMA trend bullish: EMA{fast_ema} above EMA{slow_ema}, "
+            f"slope {fast_slope_pips:.1f} pips"
+        )
+    if fast.iloc[-1] < slow.iloc[-1] and fast_slope_pips <= 0:
+        return "SELL", (
+            f"EMA trend bearish: EMA{fast_ema} below EMA{slow_ema}, "
+            f"slope {fast_slope_pips:.1f} pips"
+        )
+
+    return None, (
+        f"Trend mixed: recent move {recent_move:.1f} pips, "
+        f"EMA{fast_ema}={fast.iloc[-1]:.5f}, EMA{slow_ema}={slow.iloc[-1]:.5f}"
+    )
+
+
+def check_trend_alignment(
+    direction: str,
+    candles: pd.DataFrame,
+    pair: str,
+) -> tuple[bool, str | None, str]:
+    """Return whether the signal direction agrees with the current trend."""
+    if not TREND_FILTER_ENABLED:
+        return True, None, "Trend filter disabled"
+
+    trend_direction, detail = resolve_trend_direction(candles, pair)
+    if trend_direction is None:
+        return False, None, detail
+    if direction != trend_direction:
+        return False, trend_direction, detail
+    return True, trend_direction, detail
 
 
 # ── News blackout filter ──────────────────────────────────────────────────────

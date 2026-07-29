@@ -24,7 +24,7 @@ export function SessionPicker({ value, onChange }: Props) {
   }
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="grid gap-2 sm:flex sm:flex-wrap">
       {ALL_SESSIONS.map((session) => {
         const active = value.includes(session);
         return (
@@ -32,7 +32,7 @@ export function SessionPicker({ value, onChange }: Props) {
             key={session}
             type="button"
             onClick={() => toggle(session)}
-            className={`px-3 py-1.5 rounded text-xs font-medium border transition-colors ${
+            className={`rounded border px-3 py-1.5 text-left text-xs font-medium transition-colors sm:text-center ${
               active
                 ? "bg-primary text-primary-foreground border-primary"
                 : "bg-transparent text-muted-foreground border-border hover:border-primary/50"

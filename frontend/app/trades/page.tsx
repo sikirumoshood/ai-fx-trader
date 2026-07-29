@@ -48,9 +48,9 @@ export default function TradesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl font-semibold">Trades</h1>
-        <Button onClick={() => setFormOpen(true)}>Place Custom Trade</Button>
+        <Button onClick={() => setFormOpen(true)} className="w-full sm:w-auto">Place Custom Trade</Button>
       </div>
 
       <Card>
@@ -58,7 +58,8 @@ export default function TradesPage() {
         <CardContent className="p-0 pb-2">
           {isLoading ? <p className="text-sm text-muted-foreground text-center py-8">Loading...</p> :
            open.length === 0 ? <p className="text-sm text-muted-foreground text-center py-8">No open trades.</p> :
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[680px] text-sm">
             <thead>
               <tr className="border-b border-border text-muted-foreground text-xs">
                 <th className="text-left py-2 px-3">Pair</th>
@@ -83,7 +84,8 @@ export default function TradesPage() {
                 </tr>
               ))}
             </tbody>
-          </table>}
+          </table>
+          </div>}
         </CardContent>
       </Card>
 
@@ -91,7 +93,8 @@ export default function TradesPage() {
         <CardHeader><CardTitle>Closed Trades ({closed.length})</CardTitle></CardHeader>
         <CardContent className="p-0 pb-2">
           {closed.length === 0 ? <p className="text-sm text-muted-foreground text-center py-8">No closed trades.</p> :
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[620px] text-sm">
             <thead>
               <tr className="border-b border-border text-muted-foreground text-xs">
                 <th className="text-left py-2 px-3">Pair</th>
@@ -118,13 +121,14 @@ export default function TradesPage() {
                 </tr>
               ))}
             </tbody>
-          </table>}
+          </table>
+          </div>}
         </CardContent>
       </Card>
 
       <Dialog open={formOpen} onClose={() => setFormOpen(false)} title="Place Custom Trade">
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label>Pair</Label>
               <Select value={form.pair} onChange={e => set("pair", e.target.value)}>
@@ -156,7 +160,7 @@ export default function TradesPage() {
             <p className="text-xs text-sell">{(createTrade.error as Error).message}</p>
           )}
 
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
             <Button variant="outline" onClick={() => setFormOpen(false)}>Cancel</Button>
             <Button
               onClick={() => createTrade.mutate(form)}

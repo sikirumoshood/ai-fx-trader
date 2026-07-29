@@ -41,11 +41,11 @@ export function AnalyzeForm({ onDone }: { onDone?: () => void }) {
 
   return (
     <>
-      <Button onClick={() => setOpen(true)}>Analyze Pair</Button>
+      <Button onClick={() => setOpen(true)} className="w-full sm:w-auto">Analyze Pair</Button>
 
       <Dialog open={open} onClose={() => setOpen(false)} title="Analyze Pair">
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="pair">Pair</Label>
               <Select id="pair" value={form.pair} onChange={e => set("pair", e.target.value)}>
@@ -62,7 +62,7 @@ export function AnalyzeForm({ onDone }: { onDone?: () => void }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label>Min Pips</Label>
               <Input type="number" value={form.min_pips} onChange={e => set("min_pips", +e.target.value)} />
@@ -90,7 +90,7 @@ export function AnalyzeForm({ onDone }: { onDone?: () => void }) {
             <p className="text-xs text-sell">{(mutation.error as Error).message}</p>
           )}
 
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
             <Button onClick={() => mutation.mutate({ ...form, sessions })} disabled={mutation.isPending}>
               {mutation.isPending ? "Analyzing..." : "Run Analysis"}

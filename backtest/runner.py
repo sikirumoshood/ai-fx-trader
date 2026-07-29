@@ -103,6 +103,7 @@ async def _run_backtest(
     try:
         # ── Phase 1: fetch full historical data ────────────────────────────
         all_candles = fetcher.fetch_ohlcv_range(pair, timeframe, start_date, end_date)
+        all_candles = all_candles.sort_values("time").reset_index(drop=True)
         if len(all_candles) < 450:
             raise RuntimeError(f"Insufficient candles: {len(all_candles)} (need ≥ 450)")
 
@@ -110,17 +111,18 @@ async def _run_backtest(
         signal_records: list[dict] = []
 
         # ── Phase 2: rolling prediction window ────────────────────────────
-        for i in range(context_size, len(all_candles) - 1):
+        for i in range(context_size, len(all_candles)):
             context = all_candles.iloc[i - context_size: i]
-            actual  = all_candles.iloc[i + 1]
+            signal_candle = all_candles.iloc[i - 1]
+            actual  = all_candles.iloc[i]
 
             # Candle time & session
-            candle_time = all_candles.iloc[i]["time"]
+            candle_time = signal_candle["time"]
             if hasattr(candle_time, "to_pydatetime"):
                 candle_time = candle_time.to_pydatetime()
             in_session, session_name = filters.check_session(candle_time, sessions=sessions)
             if sessions and not in_session:
-                signal_records.append(_skip_record(all_candles.iloc[i], "Outside selected sessions"))
+                signal_records.append(_skip_record(signal_candle, "Outside selected sessions"))
                 continue
             # Use the matched session name from check_session so the label
             # reflects the user's chosen session, not dict-order first-match.
@@ -139,7 +141,7 @@ async def _run_backtest(
                 }
             except Exception as exc:
                 log.warning("Prediction failed at index %d: %s", i, exc)
-                signal_records.append(_skip_record(all_candles.iloc[i], f"Prediction error: {exc}"))
+                signal_records.append(_skip_record(signal_candle, f"Prediction error: {exc}"))
                 continue
 
             # Confidence: predicted move vs recent ATR
@@ -148,9 +150,9 @@ async def _run_backtest(
             pred_move   = abs(next_candle["close"] - next_candle["open"])
             confidence  = round(min(0.95, 0.5 + 0.5 * (pred_move / (atr + 1e-8))), 3)
 
-            entry       = float(all_candles.iloc[i]["close"])
+            entry       = float(signal_candle["close"])
             direction   = risk.resolve_direction(entry, next_candle["close"])
-            spread_pts  = float(all_candles.iloc[i]["spread"])
+            spread_pts  = float(signal_candle["spread"])
             spread_pips = spread_pts / 10.0  # 10 points = 1 pip for 5-digit brokers
 
             if direction == "BUY":
@@ -159,15 +161,24 @@ async def _run_backtest(
                 effective_entry = entry - spread_pips * pip_size(pair)
 
             # Filters
+            trend_ok, trend_direction, trend_detail = filters.check_trend_alignment(direction, context, pair)
+            if not trend_ok:
+                reason = (
+                    f"Counter-trend prediction blocked: trend is {trend_direction}; Kronos predicted {direction}"
+                    if trend_direction
+                    else "Trend unavailable"
+                )
+                signal_records.append(_skip_record(signal_candle, f"{reason}: {trend_detail}"))
+                continue
             if not filters.check_confidence(confidence):
-                signal_records.append(_skip_record(all_candles.iloc[i], "Low confidence"))
+                signal_records.append(_skip_record(signal_candle, "Low confidence"))
                 continue
             predicted_pips = risk.predicted_move_pips(direction, effective_entry, next_candle["close"], pair)
             if not filters.check_min_pips(predicted_pips, min_pips):
-                signal_records.append(_skip_record(all_candles.iloc[i], "Min pips"))
+                signal_records.append(_skip_record(signal_candle, "Min pips"))
                 continue
             if not filters.check_spread(spread_pips):
-                signal_records.append(_skip_record(all_candles.iloc[i], "Spread"))
+                signal_records.append(_skip_record(signal_candle, "Spread"))
                 continue
 
             # Outcome: close-to-close (simple, consistent, not distorted by SL/TP sizing)
@@ -246,7 +257,7 @@ async def _persist_signals(run_id: str, records: list[dict]) -> None:
                 confidence=r.get("confidence"),
                 news_bias=NewsBias(r["news_bias"]) if r.get("news_bias") else None,
                 session=r.get("session"),
-                skip_reason=r.get("skip_reason"),
+                skip_reason=_short_skip_reason(r.get("skip_reason")),
             )
             db.add(sig)
         await db.commit()
@@ -293,3 +304,9 @@ def _skip_record(candle, reason: str) -> dict:
         "session":           None,
         "skip_reason":       reason,
     }
+
+
+def _short_skip_reason(reason: Optional[str]) -> Optional[str]:
+    if reason is None or len(reason) <= 64:
+        return reason
+    return reason[:61] + "..."

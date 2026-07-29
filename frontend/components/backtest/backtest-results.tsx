@@ -21,7 +21,8 @@ function BreakdownTable({
     <Card>
       <CardHeader className="pb-2"><CardTitle className="text-sm">{title}</CardTitle></CardHeader>
       <CardContent className="pt-0">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[520px] text-sm">
           <thead>
             <tr className="text-muted-foreground text-xs border-b border-border">
               <th className="text-left py-1.5">{rowKey}</th>
@@ -47,6 +48,7 @@ function BreakdownTable({
             ))}
           </tbody>
         </table>
+        </div>
       </CardContent>
     </Card>
   );
@@ -125,7 +127,7 @@ export function BacktestResults({ jobId }: { jobId: string }) {
   return (
     <div className="space-y-5">
       {/* Run metadata */}
-      <div className="rounded-md border border-border bg-muted/30 px-4 py-3 text-sm flex flex-wrap gap-x-6 gap-y-1">
+      <div className="flex flex-wrap gap-x-6 gap-y-1 rounded-md border border-border bg-muted/30 px-4 py-3 text-sm">
         <span><span className="text-muted-foreground">Pair: </span><strong>{job.pair}</strong></span>
         <span><span className="text-muted-foreground">TF: </span><strong>{job.timeframe}</strong></span>
         {job.start_date && job.end_date && (
@@ -147,12 +149,12 @@ export function BacktestResults({ jobId }: { jobId: string }) {
           <span><span className="text-muted-foreground">Balance: </span><strong>${job.initial_balance.toLocaleString()}</strong></span>
         )}
         {duration && (
-          <span className="ml-auto"><span className="text-muted-foreground">Duration: </span><strong>{duration}</strong></span>
+          <span className="sm:ml-auto"><span className="text-muted-foreground">Duration: </span><strong>{duration}</strong></span>
         )}
       </div>
 
       {/* Summary metric cards */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {summaryCards.map(({ label, value, sub, positive }) => (
           <div key={label} className="rounded-md border border-border bg-card px-3 py-2.5">
             <p className="text-xs text-muted-foreground mb-1">{label}</p>

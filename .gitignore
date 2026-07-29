@@ -7,6 +7,7 @@ venv/
 *.egg-info/
 dist/
 build/
+frontend/.next/
 .pytest_cache/
 .mypy_cache/
 whatsapp/session/

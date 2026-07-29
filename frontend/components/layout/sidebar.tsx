@@ -20,23 +20,23 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-56 flex-shrink-0 border-r border-border bg-card flex flex-col">
-      <div className="px-6 py-5 border-b border-border">
-        <span className="font-bold text-lg tracking-tight text-primary">AI FX Trader</span>
+    <aside className="flex w-full flex-shrink-0 flex-col border-b border-border bg-card md:w-56 md:border-b-0 md:border-r">
+      <div className="border-b border-border px-4 py-4 md:px-6 md:py-5">
+        <span className="text-base font-bold tracking-tight text-primary md:text-lg">AI FX Trader</span>
       </div>
-      <nav className="flex-1 px-3 py-4 space-y-1">
+      <nav className="flex gap-1 overflow-x-auto px-3 py-2 md:flex-1 md:flex-col md:space-y-1 md:overflow-visible md:py-4">
         {links.map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
             href={href}
             className={cn(
-              "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+              "flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors md:gap-3",
               pathname === href
                 ? "bg-primary/10 text-primary"
                 : "text-muted-foreground hover:text-foreground hover:bg-accent"
             )}
           >
-            <Icon className="w-4 h-4" />
+            <Icon className="h-4 w-4" />
             {label}
           </Link>
         ))}

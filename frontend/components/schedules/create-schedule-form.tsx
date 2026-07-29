@@ -43,10 +43,10 @@ export function CreateScheduleForm() {
 
   return (
     <>
-      <Button onClick={() => setOpen(true)}>New Schedule</Button>
+      <Button onClick={() => setOpen(true)} className="w-full sm:w-auto">New Schedule</Button>
       <Dialog open={open} onClose={() => setOpen(false)} title="Create Schedule">
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label>Pair</Label>
               <Select value={form.pair} onChange={e => set("pair", e.target.value)}>
@@ -76,7 +76,7 @@ export function CreateScheduleForm() {
             <SessionPicker value={sessions} onChange={setSessions} />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label>Min Pips</Label>
               <Input type="number" value={form.min_pips} onChange={e => set("min_pips", +e.target.value)} />
@@ -97,7 +97,7 @@ export function CreateScheduleForm() {
 
           {mutation.error && <p className="text-xs text-sell">{(mutation.error as Error).message}</p>}
 
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
             <Button onClick={() => mutation.mutate({ ...form, cron, sessions })} disabled={mutation.isPending || !cron}>
               {mutation.isPending ? "Creating..." : "Create"}

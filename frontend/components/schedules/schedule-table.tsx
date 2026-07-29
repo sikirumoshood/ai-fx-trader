@@ -41,7 +41,7 @@ export function ScheduleTable({ schedules }: { schedules: Schedule[] }) {
   return (
     <>
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full min-w-[900px] text-sm">
         <thead>
           <tr className="border-b border-border text-muted-foreground text-xs">
             <th className="text-left py-2 px-3">Pair</th>
@@ -75,7 +75,7 @@ export function ScheduleTable({ schedules }: { schedules: Schedule[] }) {
                 {sch.next_run ? format(new Date(sch.next_run), "HH:mm dd/MM") : "—"}
               </td>
               <td className="py-2.5 px-3">
-                <div className="flex gap-1.5">
+                <div className="flex flex-wrap gap-1.5">
                   <Button size="sm" variant="outline" onClick={() => openEdit(sch)}>Edit</Button>
                   {sch.status === "ACTIVE"  && <Button size="sm" variant="outline" onClick={() => pause.mutate(sch.id)}>Pause</Button>}
                   {sch.status === "PAUSED"  && <Button size="sm" onClick={() => resume.mutate(sch.id)}>Resume</Button>}
@@ -103,7 +103,7 @@ export function ScheduleTable({ schedules }: { schedules: Schedule[] }) {
           {update.error && (
             <p className="text-xs text-sell">{(update.error as Error).message}</p>
           )}
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
             <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
             <Button
               onClick={() => {

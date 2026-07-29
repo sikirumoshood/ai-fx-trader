@@ -136,7 +136,12 @@ class SignalEngine:
         except RuntimeError as exc:
             return SkipSignal(pair, timeframe, f"MT5 data fetch failed: {exc}")
 
-        if len(candles) < 50:
+        candles = candles.sort_values("time").reset_index(drop=True)
+        # copy_rates_from_pos includes the current forming candle; drop it so
+        # direction is based on fully closed bars only.
+        closed_candles = candles.iloc[:-1].copy()
+
+        if len(closed_candles) < 50:
             return SkipSignal(pair, timeframe, "Insufficient candle history")
 
         # ── 2. Current spread ──────────────────────────────────────────────
@@ -168,21 +173,34 @@ class SignalEngine:
 
         # ── 7. Kronos prediction ───────────────────────────────────────────
         try:
-            pred_df    = self.predictor.predict(candles)
+            pred_df    = self.predictor.predict(closed_candles)
             next_candle = {
                 "open":  float(pred_df["open"].iloc[0]),
                 "high":  float(pred_df["high"].iloc[0]),
                 "low":   float(pred_df["low"].iloc[0]),
                 "close": float(pred_df["close"].iloc[0]),
             }
-            confidence = self.predictor.estimate_confidence(candles)  # type: ignore[attr-defined]
+            confidence = self.predictor.estimate_confidence(closed_candles)  # type: ignore[attr-defined]
         except Exception as exc:
             return SkipSignal(pair, timeframe, f"Model prediction failed: {exc}")
 
         # ── 8. Direction (entry-relative, not predicted-candle-relative) ──
         # We trade from current price to predicted close; use that vector for direction.
-        entry = float(candles["close"].iloc[-1])
+        entry = float(closed_candles["close"].iloc[-1])
         direction = risk.resolve_direction(entry, next_candle["close"])
+        trend_ok, trend_direction, trend_detail = filters.check_trend_alignment(
+            direction,
+            closed_candles,
+            pair,
+        )
+        if not trend_ok:
+            if trend_direction:
+                return SkipSignal(
+                    pair, timeframe,
+                    f"Counter-trend prediction blocked: trend is {trend_direction} ({trend_detail}); "
+                    f"Kronos predicted {direction} from entry to predicted close."
+                )
+            return SkipSignal(pair, timeframe, f"Trend filter unavailable: {trend_detail}")
 
         # ── 9. Confidence filter ───────────────────────────────────────────
         if not filters.check_confidence(confidence):
@@ -233,6 +251,7 @@ class SignalEngine:
             session=session_name,
             session_minutes_left=session_minutes_left,
             spread_pips=spread_pips,
+            trend_detail=trend_detail,
         )
 
         return Signal(
@@ -272,11 +291,14 @@ def _build_reason(
     session: str,
     session_minutes_left: int | None,
     spread_pips: float,
+    trend_detail: str | None = None,
 ) -> str:
     parts = [
         f"Kronos predicts {direction} with {confidence:.0%} confidence.",
         f"Predicted move: {move:.1f} pips.",
     ]
+    if trend_detail:
+        parts.append(f"Trend aligned: {trend_detail}.")
     if news_bias != "NEUTRAL":
         parts.append(f"News sentiment: {news_bias.lower()}.")
     if session_minutes_left is not None and session_minutes_left <= 60:
