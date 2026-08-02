@@ -10,7 +10,7 @@ import { Select } from "@/components/ui/select";
 import { Dialog } from "@/components/ui/dialog";
 import { SessionPicker } from "@/components/ui/session-picker";
 
-const TIMEFRAMES = ["M15", "H1", "H4", "D1"];
+const TIMEFRAMES = ["M1","M5","M15","M30","H1","H4","D1","W1"];
 
 export function AnalyzeForm({ onDone }: { onDone?: () => void }) {
   const [open, setOpen] = useState(false);

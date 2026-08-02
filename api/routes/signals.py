@@ -1,80 +1,24 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Body, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.schemas import AnalyzeRequest, SignalResponse, ConfirmResponse, RejectResponse
+from api.schemas import SignalResponse, ConfirmRequest, ConfirmResponse, RejectResponse
 from data.store import (
     get_db, Signal as DBSignal, Trade as DBTrade,
     SignalStatus, SignalDirection, NewsBias,
 )
-from config.settings import DEFAULT_RISK_PERCENT, DEFAULT_STOP_LOSS_PIPS
-from signals.engine import SignalEngine, SkipSignal
+from config.settings import DEFAULT_LOT_SIZE, DEFAULT_RISK_PERCENT, pip_size
 from signals.risk import calculate_lot_size
-from data.fetcher import get_account_balance
+
+log = logging.getLogger(__name__)
 
 router = APIRouter()
-
-
-# ── Dependency: signal engine from app state ──────────────────────────────────
-
-def _engine(request: Request) -> SignalEngine:
-    engine: Optional[SignalEngine] = getattr(request.app.state, "signal_engine", None)
-    if engine is None:
-        raise HTTPException(status_code=503, detail="Signal engine not initialised")
-    return engine
-
-
-# ── POST /signals/analyze ─────────────────────────────────────────────────────
-
-@router.post("/analyze", status_code=status.HTTP_201_CREATED, response_model=SignalResponse)
-async def analyze(
-    req: AnalyzeRequest,
-    db: AsyncSession = Depends(get_db),
-    engine: SignalEngine = Depends(_engine),
-):
-    result = await engine.generate(
-        pair=req.pair.upper(),
-        timeframe=req.timeframe.upper(),
-        min_pips=req.min_pips,
-        stop_loss_pips=req.stop_loss_pips,
-        risk_reward=req.risk_reward,
-        risk_percent=req.risk_percent,
-        sessions=req.sessions if req.sessions else None,
-    )
-
-    if isinstance(result, SkipSignal):
-        raise HTTPException(
-            status_code=status.HTTP_200_OK,
-            detail={"signal": "SKIP", "pair": result.pair, "reason": result.reason},
-        )
-
-    sig = DBSignal(
-        id=result.id,
-        status=SignalStatus.PENDING,
-        direction=SignalDirection(result.direction),
-        pair=result.pair,
-        timeframe=result.timeframe,
-        entry=result.entry,
-        stop_loss=result.stop_loss,
-        take_profit=result.take_profit,
-        risk_reward=result.risk_reward,
-        confidence=result.confidence,
-        news_bias=NewsBias(result.news_bias) if result.news_bias else None,
-        reason=result.reason,
-        expires_at=result.expires_at,
-        created_at=result.created_at,
-    )
-    db.add(sig)
-    await db.commit()
-    await db.refresh(sig)
-
-    return _to_response(sig)
 
 
 # ── GET /signals ──────────────────────────────────────────────────────────────
@@ -102,54 +46,132 @@ async def get_signal(signal_id: str, db: AsyncSession = Depends(get_db)):
 # ── POST /signals/{id}/confirm ────────────────────────────────────────────────
 
 @router.post("/{signal_id}/confirm", response_model=ConfirmResponse)
-async def confirm_signal(signal_id: str, db: AsyncSession = Depends(get_db)):
+async def confirm_signal(
+    signal_id: str,
+    req: ConfirmRequest = Body(default=ConfirmRequest()),
+    db: AsyncSession = Depends(get_db),
+):
     sig = await _get_pending(signal_id, db)
 
-    balance  = get_account_balance() or 10_000.0
-    lot_size = calculate_lot_size(
-        account_balance=balance,
-        risk_percent=DEFAULT_RISK_PERCENT,
-        stop_loss_pips=DEFAULT_STOP_LOSS_PIPS,
-        pair=sig.pair,
-    )
+    if req.lot_size is not None:
+        per_trade_lots = req.lot_size
+    else:
+        from data import fetcher
+        balance = fetcher.get_account_balance() or 0.0
+        if balance > 0 and sig.stop_loss is not None:
+            sl_pips = abs(sig.entry - sig.stop_loss) / pip_size(sig.pair)
+            per_trade_lots = calculate_lot_size(balance, DEFAULT_RISK_PERCENT, sl_pips, sig.pair)
+        else:
+            per_trade_lots = DEFAULT_LOT_SIZE
 
     from execution import trader
+    now = datetime.now(timezone.utc)
+
+    # Phase 1: place all MT5 orders up front, collecting results as plain dicts.
+    # No DB writes happen here so a placement failure never leaves a partial DB state.
+    placed: list[dict] = []
+    sig_snap = {
+        "id":          sig.id,
+        "pair":        sig.pair,
+        "direction":   sig.direction,
+        "order_type":  sig.order_type,
+        "entry":       sig.entry,
+        "stop_loss":   req.stop_loss   if req.stop_loss   is not None else sig.stop_loss,
+        "take_profit": req.take_profit if req.take_profit is not None else sig.take_profit,
+    }
+
+    for i in range(req.stack_count):
+        try:
+            if sig_snap["order_type"] == "LIMIT":
+                order = trader.place_pending_order(
+                    pair=sig_snap["pair"],
+                    direction=sig_snap["direction"].value,
+                    order_type="LIMIT",
+                    entry=sig_snap["entry"],
+                    lot_size=per_trade_lots,
+                    stop_loss=sig_snap["stop_loss"],
+                    take_profit=sig_snap["take_profit"],
+                    signal_id=sig_snap["id"],
+                )
+            else:
+                order = trader.place_order(
+                    pair=sig_snap["pair"],
+                    direction=sig_snap["direction"].value,
+                    lot_size=per_trade_lots,
+                    stop_loss=sig_snap["stop_loss"],
+                    take_profit=sig_snap["take_profit"],
+                    signal_id=sig_snap["id"],
+                )
+        except RuntimeError as exc:
+            if not placed:
+                raise HTTPException(status_code=502, detail=f"MT5 order failed: {exc}")
+            # Partial stack — some trades placed; stop here and persist what succeeded.
+            break
+
+        placed.append({
+            "trade_id":    f"trd_{uuid.uuid4().hex[:10]}",
+            "stack_index": i,
+            "mt5_ticket":  order["ticket"],
+            "open_price":  order["price"],
+        })
+
+    trade_ids = [o["trade_id"] for o in placed]
+
+    # Phase 2: persist — retry once on transient DB failure.
+    # Trades are already LIVE on MT5 at this point; losing the DB record would
+    # create a ghost trade with no local tracking.
+    async def _write(session: AsyncSession) -> None:
+        s = await session.get(DBSignal, sig_snap["id"])
+        for o in placed:
+            session.add(DBTrade(
+                id=o["trade_id"],
+                signal_id=sig_snap["id"],
+                stack_index=o["stack_index"],
+                mt5_ticket=o["mt5_ticket"],
+                pair=sig_snap["pair"],
+                direction=sig_snap["direction"],
+                order_type=sig_snap["order_type"],
+                entry=sig_snap["entry"],
+                stop_loss=sig_snap["stop_loss"],
+                take_profit=sig_snap["take_profit"],
+                lot_size=per_trade_lots,
+                open_price=o["open_price"],
+                status="OPEN",
+                opened_at=now,
+            ))
+        s.status      = SignalStatus.EXECUTED
+        s.executed_at = now
+        s.trade_id    = trade_ids[0]
+        await session.commit()
+
     try:
-        order = trader.place_order(
-            pair=sig.pair,
-            direction=sig.direction.value,
-            lot_size=lot_size,
-            stop_loss=sig.stop_loss,
-            take_profit=sig.take_profit,
-            signal_id=sig.id,
-        )
-    except RuntimeError as exc:
-        raise HTTPException(status_code=502, detail=f"MT5 order failed: {exc}")
+        await _write(db)
+    except Exception:
+        await db.rollback()
+        try:
+            await _write(db)
+        except Exception:
+            log.critical(
+                "CRITICAL: MT5 trades LIVE but DB write failed twice. "
+                "signal_id=%s mt5_tickets=%s",
+                sig_snap["id"], [o["mt5_ticket"] for o in placed],
+            )
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "error": "Trades placed on MT5 but could not be recorded — they are LIVE.",
+                    "mt5_tickets": [o["mt5_ticket"] for o in placed],
+                    "signal_id": sig_snap["id"],
+                },
+            )
 
-    now      = datetime.now(timezone.utc)
-    trade_id = f"trd_{uuid.uuid4().hex[:10]}"
-
-    trade = DBTrade(
-        id=trade_id,
-        mt5_ticket=order["ticket"],
-        pair=sig.pair,
-        direction=sig.direction,
-        entry=sig.entry,
-        stop_loss=sig.stop_loss,
-        take_profit=sig.take_profit,
-        lot_size=lot_size,
-        open_price=order["price"],
-        status="OPEN",
-        opened_at=now,
+    return ConfirmResponse(
+        id=sig_snap["id"],
+        status="EXECUTED",
+        trade_ids=trade_ids,
+        stack_count=len(trade_ids),
+        executed_at=now,
     )
-    db.add(trade)
-
-    sig.status      = SignalStatus.EXECUTED
-    sig.executed_at = now
-    sig.trade_id    = trade_id
-
-    await db.commit()
-    return ConfirmResponse(id=sig.id, status="EXECUTED", trade_id=trade_id, executed_at=now)
 
 
 # ── POST /signals/{id}/reject ─────────────────────────────────────────────────
@@ -193,12 +215,17 @@ def _to_response(sig: DBSignal) -> SignalResponse:
         status=sig.status.value,
         expires_at=sig.expires_at,
         signal=sig.direction.value,
+        order_type=sig.order_type or "MARKET",
         entry=sig.entry,
         stop_loss=sig.stop_loss,
         take_profit=sig.take_profit,
         risk_reward=sig.risk_reward,
         confidence=sig.confidence,
         news_bias=sig.news_bias.value if sig.news_bias else None,
+        rsi=sig.rsi,
+        rsi_advisory=sig.rsi_advisory,
+        pattern_name=sig.pattern_name,
+        pattern_bias=sig.pattern_bias,
         reason=sig.reason,
         pair=sig.pair,
         timeframe=sig.timeframe,

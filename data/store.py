@@ -64,6 +64,10 @@ class BacktestStatus(str, enum.Enum):
     DONE    = "DONE"
     FAILED  = "FAILED"
 
+class JournalOutcome(str, enum.Enum):
+    WIN  = "WIN"
+    LOSS = "LOSS"
+
 
 # ── Models ────────────────────────────────────────────────────────────────────
 
@@ -76,27 +80,35 @@ class Signal(Base):
     pair        = Column(String(12), nullable=False)
     timeframe   = Column(String(8), nullable=False)
     entry       = Column(Float, nullable=False)
+    order_type  = Column(String(16), nullable=False, server_default="MARKET")
     stop_loss   = Column(Float, nullable=False)
     take_profit = Column(Float, nullable=False)
     risk_reward = Column(Float, nullable=False)
     confidence  = Column(Float, nullable=False)
-    news_bias   = Column(SAEnum(NewsBias), nullable=True)
-    reason      = Column(Text, nullable=True)
-    expires_at  = Column(DateTime(timezone=True), nullable=False)
+    news_bias    = Column(SAEnum(NewsBias), nullable=True)
+    rsi          = Column(Float, nullable=True)
+    rsi_advisory = Column(String(120), nullable=True)
+    pattern_name = Column(String(64), nullable=True)
+    pattern_bias = Column(String(16), nullable=True)
+    reason       = Column(Text, nullable=True)
+    expires_at   = Column(DateTime(timezone=True), nullable=False)
     created_at  = Column(DateTime(timezone=True), default=_now, nullable=False)
     executed_at = Column(DateTime(timezone=True), nullable=True)
     trade_id    = Column(String, ForeignKey("trades.id"), nullable=True)
 
-    trade = relationship("Trade", back_populates="signal", uselist=False)
+    trade = relationship("Trade", uselist=False, foreign_keys=[trade_id])
 
 
 class Trade(Base):
     __tablename__ = "trades"
 
     id          = Column(String, primary_key=True)
+    signal_id   = Column(String, ForeignKey("signals.id"), nullable=True)
+    stack_index = Column(Integer, nullable=True)   # 0-based position within a stack
     mt5_ticket  = Column(BigInteger, nullable=True)
     pair        = Column(String(12), nullable=False)
     direction   = Column(SAEnum(SignalDirection), nullable=False)
+    order_type  = Column(String(16), nullable=False, default="MARKET")  # MARKET | LIMIT | STOP
     entry       = Column(Float, nullable=False)
     stop_loss   = Column(Float, nullable=True)
     take_profit = Column(Float, nullable=True)
@@ -104,11 +116,11 @@ class Trade(Base):
     open_price  = Column(Float, nullable=True)
     close_price = Column(Float, nullable=True)
     profit_pips = Column(Float, nullable=True)
-    status      = Column(String(16), nullable=False, default="OPEN")
+    status      = Column(String(16), nullable=False, default="OPEN")  # OPEN | PENDING | CLOSED | CANCELED
     opened_at   = Column(DateTime(timezone=True), default=_now, nullable=False)
     closed_at   = Column(DateTime(timezone=True), nullable=True)
 
-    signal = relationship("Signal", back_populates="trade", uselist=False)
+    signal = relationship("Signal", uselist=False, foreign_keys=[signal_id])
 
 
 class Schedule(Base):
@@ -118,12 +130,20 @@ class Schedule(Base):
     pair            = Column(String(12), nullable=False)
     timeframe       = Column(String(8), nullable=False)
     cron            = Column(String(64), nullable=False)
+    indicator       = Column(String(16), nullable=False, default="ifvg")
     min_pips        = Column(Float, nullable=False)
     stop_loss_pips  = Column(Float, nullable=False)
     risk_reward     = Column(Float, nullable=False)
     risk_percent    = Column(Float, nullable=False)
     notify          = Column(Boolean, default=True)
+    notify_email    = Column(String(254), nullable=True)
     sessions        = Column(JSON, nullable=True)
+    ifvg_threshold  = Column(Float, nullable=True, default=0.0)
+    auto_execute              = Column(Boolean, nullable=False, default=False)
+    auto_lot_size             = Column(Float, nullable=True)
+    max_risk_amount           = Column(Float, nullable=True)
+    auto_close_profit         = Column(Boolean, nullable=True, default=False)
+    auto_close_profit_amount  = Column(Float, nullable=True)
     status          = Column(SAEnum(ScheduleStatus), nullable=False, default=ScheduleStatus.ACTIVE)
     next_run        = Column(DateTime(timezone=True), nullable=True)
     created_at      = Column(DateTime(timezone=True), default=_now, nullable=False)
@@ -150,6 +170,7 @@ class BacktestRun(Base):
     id              = Column(String, primary_key=True)
     pair            = Column(String(12), nullable=False)
     timeframe       = Column(String(8), nullable=False)
+    indicator       = Column(String(16), nullable=False, default="ifvg")
     start_date      = Column(DateTime(timezone=True), nullable=False)
     end_date        = Column(DateTime(timezone=True), nullable=False)
     min_pips        = Column(Float, nullable=False)
@@ -158,6 +179,7 @@ class BacktestRun(Base):
     risk_percent    = Column(Float, nullable=False)
     initial_balance = Column(Float, nullable=False)
     sessions        = Column(JSON, nullable=True)
+    ifvg_threshold  = Column(Float, nullable=True, default=0.0)
     status          = Column(SAEnum(BacktestStatus), nullable=False, default=BacktestStatus.QUEUED)
     error           = Column(Text, nullable=True)
     created_at      = Column(DateTime(timezone=True), default=_now, nullable=False)
@@ -169,7 +191,7 @@ class BacktestRun(Base):
 
 
 class BacktestPrediction(Base):
-    """Cached Kronos predictions — reused across runs with same pair/timeframe."""
+    """Cached backtest predictions — reused across runs with same pair/timeframe."""
     __tablename__ = "backtest_predictions"
 
     id          = Column(Integer, primary_key=True, autoincrement=True)
@@ -225,6 +247,21 @@ class BacktestMetric(Base):
     equity_curve    = Column(JSON, nullable=True)
 
     run = relationship("BacktestRun", back_populates="metrics")
+
+
+class JournalEntry(Base):
+    __tablename__ = "journal_entries"
+
+    id         = Column(String, primary_key=True)
+    pair       = Column(String(12), nullable=False)
+    lot_size   = Column(Float, nullable=False)
+    strategy   = Column(String(32), nullable=False)
+    session    = Column(String(16), nullable=False)
+    trade_mode = Column(String(16), nullable=False, default="MANUAL")  # AI | MANUAL
+    amount_usd = Column(Float, nullable=False)   # positive = profit, negative = loss
+    outcome    = Column(SAEnum(JournalOutcome), nullable=False)
+    trade_date = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=_now, nullable=False)
 
 
 # ── Schema creation helper (used in tests / first-run) ───────────────────────

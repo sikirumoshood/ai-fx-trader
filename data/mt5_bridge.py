@@ -10,6 +10,7 @@ fetcher.py can use it transparently.
 """
 from __future__ import annotations
 
+import logging
 import os
 import threading
 import time
@@ -17,8 +18,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+_log = logging.getLogger(__name__)
 
-_TIMEOUT = 15   # seconds to wait for EA to respond
+
+_TIMEOUT         = 15    # seconds for fast requests (PING, TICK, ORDER, etc.)
+_TIMEOUT_HISTORY = 120   # seconds for bulk OHLCV_RANGE requests
 _MAGIC   = 20260101
 _RETCODE_DONE = 10009   # TRADE_RETCODE_DONE
 
@@ -77,6 +81,10 @@ class _Deal:
     )
 
 
+class _PendingOrder:
+    __slots__ = ("ticket", "symbol", "type", "volume_initial", "price_open", "magic")
+
+
 class _OrderResult:
     __slots__ = ("retcode", "order", "price", "volume", "comment")
     def __init__(self, retcode: int, order: int = 0, price: float = 0.0,
@@ -104,11 +112,17 @@ class MT5Bridge:
     TIMEFRAME_W1  = "W1"
     TIMEFRAME_MN1 = "MN1"
 
-    ORDER_TYPE_BUY  = 0
-    ORDER_TYPE_SELL = 1
+    ORDER_TYPE_BUY        = 0
+    ORDER_TYPE_SELL       = 1
+    ORDER_TYPE_BUY_LIMIT  = 2
+    ORDER_TYPE_SELL_LIMIT = 3
+    ORDER_TYPE_BUY_STOP   = 4
+    ORDER_TYPE_SELL_STOP  = 5
 
-    TRADE_ACTION_DEAL = 1
-    TRADE_ACTION_SLTP = 6
+    TRADE_ACTION_DEAL    = 1
+    TRADE_ACTION_PENDING = 5
+    TRADE_ACTION_SLTP    = 6
+    TRADE_ACTION_REMOVE  = 8
 
     ORDER_TIME_GTC    = 1
     ORDER_FILLING_IOC = 1
@@ -139,7 +153,7 @@ class MT5Bridge:
 
     # ── Low-level I/O ─────────────────────────────────────────────────────────
 
-    def _send_recv(self, command: str) -> str:
+    def _send_recv(self, command: str, timeout: int = _TIMEOUT) -> str:
         req_path = self._dir / _REQ_FILE
         res_path = self._dir / _RES_FILE
 
@@ -153,7 +167,7 @@ class MT5Bridge:
 
             # Wait for EA to consume the request file (EA deletes it after
             # writing the response — guarantees response is fully flushed)
-            deadline = time.monotonic() + _TIMEOUT
+            deadline = time.monotonic() + timeout
             while req_path.exists():
                 if time.monotonic() > deadline:
                     req_path.unlink(missing_ok=True)
@@ -206,14 +220,26 @@ class MT5Bridge:
     ) -> list[dict]:
         resp  = self._send_recv(f"OHLCV|{symbol}|{timeframe}|{count}")
         parts = self._ok(resp)
-        return [_parse_rate(r) for r in parts if r]
+        rates = [r for r in (_parse_rate(p) for p in parts if p) if r is not None]
+        skipped = len([p for p in parts if p]) - len(rates)
+        if skipped:
+            _log.warning("MT5 OHLCV %s %s: %d malformed record(s) skipped out of %d", symbol, timeframe, skipped, len(parts))
+        _log.debug("MT5 OHLCV %s %s: received %d candles (requested %d)", symbol, timeframe, len(rates), count)
+        if rates:
+            last = rates[-1]
+            _log.debug("MT5 OHLCV last candle: time=%s O=%.5f H=%.5f L=%.5f C=%.5f vol=%s",
+                       last["time"], last["open"], last["high"], last["low"], last["close"], last["tick_volume"])
+        return rates
 
     def copy_rates_range(
         self, symbol: str, timeframe: str, start: datetime, end: datetime
     ) -> list[dict]:
         from_ts = int(start.timestamp())
         to_ts   = int(end.timestamp())
-        resp    = self._send_recv(f"OHLCV_RANGE|{symbol}|{timeframe}|{from_ts}|{to_ts}")
+        resp    = self._send_recv(
+            f"OHLCV_RANGE|{symbol}|{timeframe}|{from_ts}|{to_ts}",
+            timeout=_TIMEOUT_HISTORY,
+        )
         parts   = self._ok(resp)
         return [_parse_rate(r) for r in parts if r]
 
@@ -250,6 +276,23 @@ class MT5Bridge:
         except Exception:
             return []
 
+    def orders_get(
+        self, symbol: Optional[str] = None
+    ) -> list[_PendingOrder]:
+        try:
+            parts  = self._ok(self._send_recv("ORDERS"))
+            result = []
+            for record in parts:
+                if not record:
+                    continue
+                o = _parse_pending_order(record)
+                if symbol is not None and o.symbol != symbol:
+                    continue
+                result.append(o)
+            return result
+        except Exception:
+            return []
+
     def history_deals_get(
         self, date_from: datetime, date_to: datetime
     ) -> list[_Deal]:
@@ -259,6 +302,13 @@ class MT5Bridge:
             return [_parse_deal(r) for r in parts if r]
         except Exception:
             return []
+
+    _PENDING_TYPE_MAP = {
+        2: "BUY_LIMIT",
+        3: "SELL_LIMIT",
+        4: "BUY_STOP",
+        5: "SELL_STOP",
+    }
 
     def order_send(self, request: dict) -> _OrderResult:
         action = request.get("action")
@@ -281,10 +331,29 @@ class MT5Bridge:
                         price=float(parts[1]),
                         volume=float(parts[2]),
                     )
+            elif action == self.TRADE_ACTION_PENDING:
+                otype = self._PENDING_TYPE_MAP.get(request["type"])
+                if otype is None:
+                    return _OrderResult(10004, comment=f"Unknown pending type: {request['type']}")
+                parts = self._ok(self._send_recv(
+                    f"PENDING|{request['symbol']}|{otype}"
+                    f"|{request['volume']}|{request['price']}"
+                    f"|{request['sl']}|{request['tp']}"
+                    f"|{request.get('comment', 'aifx')}"
+                ))
+                return _OrderResult(
+                    _RETCODE_DONE,
+                    order=int(parts[0]),
+                    price=float(parts[1]),
+                    volume=float(parts[2]),
+                )
             elif action == self.TRADE_ACTION_SLTP:
                 sl = request.get("sl", 0.0)
                 tp = request.get("tp", 0.0)
                 self._ok(self._send_recv(f"MODIFY|{request['position']}|{sl}|{tp}"))
+                return _OrderResult(_RETCODE_DONE)
+            elif action == self.TRADE_ACTION_REMOVE:
+                self._ok(self._send_recv(f"CANCEL_PENDING|{request['order']}"))
                 return _OrderResult(_RETCODE_DONE)
             else:
                 return _OrderResult(10004, comment=f"Unknown action: {action}")
@@ -294,17 +363,22 @@ class MT5Bridge:
 
 # ── Record parsers ────────────────────────────────────────────────────────────
 
-def _parse_rate(record: str) -> dict:
+def _parse_rate(record: str) -> dict | None:
     f = record.split(",")
-    return {
-        "time":        int(f[0]),
-        "open":        float(f[1]),
-        "high":        float(f[2]),
-        "low":         float(f[3]),
-        "close":       float(f[4]),
-        "tick_volume": int(f[5]),
-        "spread":      int(f[6]),
-    }
+    if len(f) < 7:
+        return None
+    try:
+        return {
+            "time":        int(f[0]),
+            "open":        float(f[1]),
+            "high":        float(f[2]),
+            "low":         float(f[3]),
+            "close":       float(f[4]),
+            "tick_volume": int(f[5]),
+            "spread":      int(f[6]),
+        }
+    except (ValueError, IndexError):
+        return None
 
 
 def _parse_position(record: str) -> _Position:
@@ -321,6 +395,18 @@ def _parse_position(record: str) -> _Position:
     p.time       = int(f[8])
     p.magic      = _MAGIC
     return p
+
+
+def _parse_pending_order(record: str) -> _PendingOrder:
+    f = record.split(",")
+    o = _PendingOrder()
+    o.ticket        = int(f[0])
+    o.symbol        = f[1]
+    o.type          = int(f[2])
+    o.volume_initial = float(f[3])
+    o.price_open    = float(f[4])
+    o.magic         = _MAGIC
+    return o
 
 
 def _parse_deal(record: str) -> _Deal:

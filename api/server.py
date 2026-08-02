@@ -8,8 +8,8 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from config.settings import FX_API_KEY, MODEL_NAME, SCHEDULE_LOG_PATH
-from api.routes import signals, schedules, trades, system
+from config.settings import FX_API_KEY, SCHEDULE_LOG_PATH
+from api.routes import signals, schedules, trades, system, journal
 
 log = logging.getLogger(__name__)
 
@@ -54,10 +54,18 @@ async def lifespan(app: FastAPI):
     _configure_schedule_execution_logging()
     log.info("Starting AI FX Trader...")
 
-    # 1. Create DB tables (idempotent)
-    from data.store import create_all_tables
-    await create_all_tables()
-    log.info("DB tables ready")
+    # 1. Run Alembic migrations (creates tables + applies any pending schema changes)
+    import asyncio
+    from alembic.config import Config
+    from alembic import command as alembic_command
+    from pathlib import Path
+
+    def _run_migrations() -> None:
+        cfg = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
+        alembic_command.upgrade(cfg, "head")
+
+    await asyncio.get_event_loop().run_in_executor(None, _run_migrations)
+    log.info("DB migrations applied")
 
     # 2. Connect to MT5
     from data import fetcher
@@ -69,23 +77,14 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         log.warning("MT5 connection failed (%s) — live trading disabled", exc)
 
-    # 3. Load prediction model
-    from model.kronos import KronosPredictor
-    predictor = KronosPredictor()
-    # Model weights load lazily on first predict() call — no blocking at startup
-
-    # 4. Build signal engine
-    from signals.engine import SignalEngine
-    app.state.signal_engine = SignalEngine(predictor)
-    log.info("Signal engine ready (model: %s, lazy-load)", MODEL_NAME)
-
-    # 5. Start APScheduler and restore active schedules from DB
+    # 3. Start APScheduler and restore active schedules from DB
     from scheduler import jobs
     from data.store import AsyncSessionLocal, Schedule as DBSchedule, ScheduleStatus
     from sqlalchemy import select
     from api.routes.schedules import _run_scheduled_signal, _job_kwargs
 
     jobs.start()
+    jobs.register_maintenance_jobs()
 
     async with AsyncSessionLocal() as db:
         rows = await db.execute(
@@ -153,3 +152,4 @@ app.include_router(system.router)
 app.include_router(signals.router,   prefix="/signals",   tags=["Signals"])
 app.include_router(schedules.router, prefix="/schedules", tags=["Schedules"])
 app.include_router(trades.router,    prefix="/trades",    tags=["Trades"])
+app.include_router(journal.router,   prefix="/journal",   tags=["Journal"])

@@ -29,10 +29,6 @@ async def health(request: Request, db: AsyncSession = Depends(get_db)):
     except Exception:
         mt5_ok = False
 
-    # Model
-    engine = getattr(request.app.state, "signal_engine", None)
-    model_ok = engine is not None and engine.predictor.is_loaded()
-
     # DB
     try:
         await db.execute(text("SELECT 1"))
@@ -44,7 +40,7 @@ async def health(request: Request, db: AsyncSession = Depends(get_db)):
     return HealthResponse(
         status=overall,
         mt5_connected=mt5_ok,
-        model_loaded=model_ok,
+        model_loaded=True,
         db_connected=db_ok,
         timestamp=datetime.now(timezone.utc),
     )
@@ -79,6 +75,7 @@ async def list_backtests(db: AsyncSession = Depends(get_db)):
             error=r.error,
             pair=r.pair,
             timeframe=r.timeframe,
+            indicator=r.indicator,
             start_date=r.start_date,
             end_date=r.end_date,
             min_pips=r.min_pips,
@@ -87,6 +84,7 @@ async def list_backtests(db: AsyncSession = Depends(get_db)):
             risk_percent=r.risk_percent,
             initial_balance=r.initial_balance,
             sessions=r.sessions,
+            ifvg_threshold=r.ifvg_threshold,
             traded=m.traded if m else None,
             win_rate=m.win_rate if m else None,
             total_pips=m.total_return if m else None,
@@ -108,10 +106,6 @@ async def submit_backtest(
     from datetime import date
     from backtest.runner import submit_run
 
-    engine = getattr(request.app.state, "signal_engine", None)
-    if engine is None:
-        raise HTTPException(status_code=503, detail="Signal engine not initialised")
-
     try:
         start = datetime.strptime(req.start_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
         end   = datetime.strptime(req.end_date,   "%Y-%m-%d").replace(tzinfo=timezone.utc)
@@ -124,6 +118,7 @@ async def submit_backtest(
     run_id = await submit_run(
         pair=req.pair.upper(),
         timeframe=req.timeframe.upper(),
+        indicator=req.indicator,
         start_date=start,
         end_date=end,
         min_pips=req.min_pips,
@@ -131,8 +126,8 @@ async def submit_backtest(
         risk_reward=req.risk_reward,
         risk_percent=req.risk_percent,
         initial_balance=req.initial_balance,
-        predictor=engine.predictor,
         sessions=req.sessions if req.sessions else None,
+        ifvg_threshold=req.ifvg_threshold,
     )
 
     run = await db.get(BacktestRun, run_id)
@@ -160,6 +155,7 @@ async def backtest_status(job_id: str, db: AsyncSession = Depends(get_db)):
         error=run.error,
         pair=run.pair,
         timeframe=run.timeframe,
+        indicator=run.indicator,
         start_date=run.start_date,
         end_date=run.end_date,
         min_pips=run.min_pips,
@@ -168,6 +164,7 @@ async def backtest_status(job_id: str, db: AsyncSession = Depends(get_db)):
         risk_percent=run.risk_percent,
         initial_balance=run.initial_balance,
         sessions=run.sessions,
+        ifvg_threshold=run.ifvg_threshold,
         traded=m.traded if m else None,
         win_rate=m.win_rate if m else None,
         total_pips=m.total_return if m else None,

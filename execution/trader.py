@@ -19,52 +19,12 @@ def _mt5():
     return _conn
 
 
-def _filling_modes(m) -> list[int]:
-    """Return available filling modes in retry order."""
-    modes: list[int] = []
-    for name in ("ORDER_FILLING_IOC", "ORDER_FILLING_FOK", "ORDER_FILLING_RETURN"):
-        value = getattr(m, name, None)
-        if isinstance(value, int) and value not in modes:
-            modes.append(value)
-    return modes
-
-
-def _is_unsupported_filling(result) -> bool:
+def _send_order(m, request: dict):
+    """Send a single order to MT5. No retries — retrying order placement risks duplicates."""
+    result = m.order_send(request)
     if result is None:
-        return False
-    comment = (getattr(result, "comment", "") or "").lower()
-    return getattr(result, "retcode", None) == 10030 or "unsupported filling mode" in comment
-
-
-def _send_order_with_filling_fallback(m, request: dict):
-    """Try broker-supported filling modes before failing."""
-    last_result = None
-    tried_modes: list[int] = []
-    for mode in _filling_modes(m):
-        tried_modes.append(mode)
-        req = dict(request)
-        req["type_filling"] = mode
-        result = m.order_send(req)
-        if result is None:
-            last_result = None
-            continue
-        if result.retcode == m.TRADE_RETCODE_DONE:
-            return result
-        last_result = result
-        if not _is_unsupported_filling(result):
-            return result
-
-    # Fallback: send once without type_filling for bridges/adapters that ignore it.
-    req = dict(request)
-    req.pop("type_filling", None)
-    result = m.order_send(req)
-    if result is not None:
-        return result
-
-    if last_result is not None:
-        return last_result
-    tried = ",".join(str(v) for v in tried_modes) if tried_modes else "none"
-    raise RuntimeError(f"order_send returned None (filling modes tried: {tried}): {m.last_error()}")
+        raise RuntimeError(f"order_send returned None: {m.last_error()}")
+    return result
 
 
 # ── Order placement ───────────────────────────────────────────────────────────
@@ -105,11 +65,67 @@ def place_order(
         "type_time":    m.ORDER_TIME_GTC,
     }
 
-    result = _send_order_with_filling_fallback(m, request)
+    result = _send_order(m, request)
     if result.retcode != m.TRADE_RETCODE_DONE:
         raise RuntimeError(f"Order failed: retcode={result.retcode} comment={result.comment}")
 
     return {"ticket": result.order, "price": result.price, "volume": result.volume, "success": True}
+
+
+# ── Pending order placement ───────────────────────────────────────────────────
+
+def place_pending_order(
+    *,
+    pair: str,
+    direction: str,
+    order_type: str,   # "LIMIT" or "STOP"
+    entry: float,
+    lot_size: float,
+    stop_loss: float,
+    take_profit: float,
+    signal_id: str,
+) -> dict:
+    """Place a pending (limit or stop) order on MT5."""
+    m = _mt5()
+
+    _mt5_type = {
+        ("BUY",  "LIMIT"): m.ORDER_TYPE_BUY_LIMIT,
+        ("SELL", "LIMIT"): m.ORDER_TYPE_SELL_LIMIT,
+        ("BUY",  "STOP"):  m.ORDER_TYPE_BUY_STOP,
+        ("SELL", "STOP"):  m.ORDER_TYPE_SELL_STOP,
+    }.get((direction, order_type))
+    if _mt5_type is None:
+        raise RuntimeError(f"Invalid pending order type: {direction} {order_type}")
+
+    request = {
+        "action":    m.TRADE_ACTION_PENDING,
+        "symbol":    pair,
+        "volume":    lot_size,
+        "type":      _mt5_type,
+        "price":     entry,
+        "sl":        stop_loss,
+        "tp":        take_profit,
+        "magic":     _MAGIC,
+        "comment":   f"aifx:{signal_id[:8]}",
+        "type_time": m.ORDER_TIME_GTC,
+    }
+    result = m.order_send(request)
+    if result is None or result.retcode != m.TRADE_RETCODE_DONE:
+        error = result.comment if result else m.last_error()
+        raise RuntimeError(f"Pending order failed: retcode={getattr(result, 'retcode', None)} comment={error}")
+
+    return {"ticket": result.order, "price": entry, "volume": result.volume, "success": True}
+
+
+def cancel_pending_order(ticket: int) -> dict:
+    """Cancel a pending (unfilled) order on MT5."""
+    m = _mt5()
+    request = {"action": m.TRADE_ACTION_REMOVE, "order": ticket}
+    result = m.order_send(request)
+    if result is None or result.retcode != m.TRADE_RETCODE_DONE:
+        error = result.comment if result else m.last_error()
+        raise RuntimeError(f"Cancel failed: {error}")
+    return {"ticket": ticket, "success": True}
 
 
 # ── Modify open trade ─────────────────────────────────────────────────────────
@@ -163,10 +179,9 @@ def close_trade(ticket: int) -> dict:
         "comment":      "aifx:close",
         "type_time":    m.ORDER_TIME_GTC,
     }
-    result = _send_order_with_filling_fallback(m, request)
-    if result is None or result.retcode != m.TRADE_RETCODE_DONE:
-        error = result.comment if result else m.last_error()
-        raise RuntimeError(f"Close failed: {error}")
+    result = _send_order(m, request)
+    if result.retcode != m.TRADE_RETCODE_DONE:
+        raise RuntimeError(f"Close failed: retcode={result.retcode} comment={result.comment}")
 
     return {"ticket": ticket, "close_price": result.price, "success": True}
 
@@ -181,6 +196,20 @@ def get_open_positions(pair: Optional[str] = None) -> list[dict]:
     if positions is None:
         return []
     return [_position_to_dict(p) for p in positions if p.magic == _MAGIC]
+
+
+def get_pending_orders(pair: Optional[str] = None) -> list[dict]:
+    """Return unfilled limit/stop pending orders placed by this system."""
+    if not _is_available():
+        return []
+    m = _mt5()
+    orders = m.orders_get(symbol=pair) if pair else m.orders_get()
+    if orders is None:
+        return []
+    return [
+        {"ticket": o.ticket, "pair": o.symbol, "type": o.type, "volume": o.volume_initial}
+        for o in orders if o.magic == _MAGIC
+    ]
 
 
 def get_closed_deals(pair: Optional[str] = None) -> list[dict]:

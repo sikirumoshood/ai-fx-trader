@@ -147,17 +147,35 @@ def fetch_ohlcv_range(
     start: datetime,
     end: datetime,
 ) -> pd.DataFrame:
-    """Fetch OHLCV candles between start and end (UTC datetimes)."""
+    """Fetch OHLCV candles between start and end (UTC datetimes).
+
+    Splits large requests into 3-month chunks so the file bridge never has to
+    handle a massive single response (which would exceed the EA timeout).
+    """
     _require_mt5()
     tf_map = _tf_map()
     tf = tf_map.get(timeframe.upper())
     if tf is None:
         raise ValueError(f"Unsupported timeframe: {timeframe}. Valid: {list(tf_map)}")
     _ensure_auto_broker_offset(pair, tf, timeframe)
-    rates = _mt5.copy_rates_range(pair, tf, start, end)
-    if rates is None or len(rates) == 0:
+
+    chunk_size = timedelta(days=90)
+    chunks: list[pd.DataFrame] = []
+    chunk_start = start
+
+    while chunk_start < end:
+        chunk_end = min(chunk_start + chunk_size, end)
+        rates = _mt5.copy_rates_range(pair, tf, chunk_start, chunk_end)
+        if rates is not None and len(rates) > 0:
+            chunks.append(_to_df(rates, timeframe=timeframe))
+        chunk_start = chunk_end
+
+    if not chunks:
         raise RuntimeError(f"No data for {pair} {timeframe} {start}–{end}: {_mt5.last_error()}")
-    return _to_df(rates, timeframe=timeframe)
+
+    df = pd.concat(chunks, ignore_index=True)
+    df = df.drop_duplicates(subset=["time"]).sort_values("time").reset_index(drop=True)
+    return df
 
 
 def _to_df(rates, timeframe: str | None = None) -> pd.DataFrame:

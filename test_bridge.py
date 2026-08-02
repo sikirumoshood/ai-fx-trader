@@ -12,6 +12,22 @@ if b.connect():
     print("Connected!")
     acc = b.account_info()
     print("Balance:", acc.balance)
+
+    print("\n--- Open positions ---")
+    positions = b.positions_get()
+    if positions:
+        for p in positions:
+            print(f"  ticket={p.ticket} symbol={p.symbol} type={p.type} vol={p.volume} profit={p.profit}")
+    else:
+        print("  (none)")
+
+    print("\n--- Pending orders ---")
+    orders = b.orders_get()
+    if orders:
+        for o in orders:
+            print(f"  ticket={o.ticket} symbol={o.symbol} type={o.type} vol={o.volume_initial} price={o.price_open}")
+    else:
+        print("  (none)")
 else:
     print("Failed to connect")
     req = pathlib.Path(path) / "aifx_req.txt"

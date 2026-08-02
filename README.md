@@ -1,6 +1,6 @@
 # AI FX Trader
 
-An AI-powered FX trading server. Reads live OHLCV data from MetaTrader 5, predicts next candles using Kronos (a foundational time-series model), scores macro news with FinBERT, and generates BUY/SELL/SKIP signals via a REST API. **No trade is ever auto-executed** — every signal requires explicit confirmation.
+An AI-powered FX trading server. Reads live OHLCV data from MetaTrader 5, predicts next candles using Kronos (a foundational time-series model), scores macro news with FinBERT, and generates BUY/SELL/SKIP signals via a REST API. Signals require explicit confirmation by default; schedules can optionally enable **auto-execution** to place trades immediately without manual intervention.
 
 ---
 
@@ -56,7 +56,7 @@ ai-fx-trader/
 │
 ├── signals/
 │   ├── engine.py              # Full 14-step pipeline: MT5 → Kronos → FinBERT → Signal
-│   ├── risk.py                # SL/TP from predicted H/L + pip-based position sizing
+│   ├── risk.py                # SL/TP calculation (pip-based, with optional predicted H/L to tighten SL)
 │   └── filters.py             # Session, spread, confidence, min-pips, news blackout
 │
 ├── execution/
@@ -88,7 +88,7 @@ ai-fx-trader/
 │   ├── components/
 │   │   ├── layout/            # Sidebar + Header (with live MT5/model/DB status dots)
 │   │   ├── ui/                # Badge, Button, Card, Dialog, Input, Label, Select
-│   │   ├── signals/           # AnalyzeForm, SignalTable, DirectionBadge
+│   │   ├── signals/           # AnalyzeForm, SignalTable (with RSI column), DirectionBadge
 │   │   ├── schedules/         # ScheduleTable, CreateScheduleForm
 │   │   └── backtest/          # BacktestForm, BacktestResults (equity curve chart)
 │   ├── lib/
@@ -114,10 +114,15 @@ ai-fx-trader/
 All configuration loaded from environment variables with sensible defaults. Key groups:
 - **MT5**: login, password, server, terminal path
 - **Kronos**: model variant (`Kronos-base`), device (`cpu`/`cuda:0`), context window (512), prediction length (5 candles)
-- **Signal defaults**: timeframe (`H1`), min pips (15), SL pips (20), R:R (2.0), confidence threshold (0.55), signal expiry (5 min)
+- **Signal defaults**: timeframe (`H1`), min pips (15), SL pips (20), R:R (2.0), confidence threshold (0.62), signal expiry (5 min)
+- **Supported timeframes**: M1, M5, M15, M30, H1, H4, D1, W1, MN1
+- **Supported pairs**: all FX majors, minors, selected exotics, plus `XAUUSD` (Gold — pip size = 0.10)
+- **Kronos sampling**: temperature (0.7), samples per call (5) — averaging reduces stochastic noise
+- **Trend filter**: 12-candle lookback, 15-pip minimum momentum threshold (H1 meaningful moves only)
 - **Sessions**: active trading sessions (`LONDON`, `NEW_YORK`) — configurable
 - **API**: key (`X-API-Key` header), host/port
 - **Database**: async PostgreSQL URL
+- **Notifications**: Telegram (always-on when configured) + Resend email (opt-in per schedule, set `RESEND_API_KEY` and `RESEND_FROM_EMAIL`)
 
 ### `data/fetcher.py`
 MT5 data layer. Key functions:
@@ -149,20 +154,29 @@ SQLAlchemy async ORM. Models:
 ### `model/base.py` / `model/kronos.py`
 `BasePredictor` ABC — all models implement `predict(candles: DataFrame) -> DataFrame`. Swapping is a one-line config change (`MODEL_NAME=kronos|moirai|tft`).
 
-`KronosPredictor` wraps `NeoQuasar/Kronos-base`. It lazy-loads on first call, infers candle frequency automatically, and adds `estimate_confidence()` which runs 20 prediction samples and returns the fraction agreeing on direction.
+`KronosPredictor` wraps `NeoQuasar/Kronos-base`. It lazy-loads on first call, infers candle frequency automatically, and adds `estimate_confidence(candles, pred_df)` which accepts the already-fetched prediction to avoid a second stochastic model call.
 
 ### `signals/filters.py`
 Five independent gates applied in order — first failure short-circuits to SKIP:
-1. `check_confidence` — confidence ≥ `CONFIDENCE_THRESHOLD` (default 0.55)
+1. `check_confidence` — confidence ≥ `CONFIDENCE_THRESHOLD` (default 0.62)
 2. `check_min_pips` — predicted move ≥ `min_pips`
 3. `check_spread` — current spread ≤ `max_spread`
 4. `check_news_blackout` — no HIGH-impact event within ±`NEWS_BLACKOUT_MINUTES`
 5. `check_session` — current UTC time is within an `ACTIVE_SESSIONS` window
 
-`apply_all_filters()` runs all five and returns `(passed: bool, reason: str)`.
+RSI advisory (non-blocking):
+- `compute_rsi(candles, period=14)` — Wilder EMA RSI from close prices
+- `rsi_advisory(rsi_value, direction)` — returns a label: `OVERBOUGHT`, `OVERSOLD`, or `CLEAR (xx.x)` with context about whether the RSI zone agrees or conflicts with the signal direction
+- Both `rsi` and `rsi_advisory` are persisted on signals created via `/signals/analyze` and scheduled jobs
+
+`apply_all_filters()` runs all five gates and returns `(passed: bool, reason: str)`.
 
 ### `signals/risk.py`
-SL/TP calculation uses Kronos predicted H/L as natural price anchors (falls back to pip-based if not available). Position sizing risks exactly `risk_percent` of account balance.
+SL is placed at the configured `stop_loss_pips` from entry. If Kronos predicts a high/low closer to entry than the configured SL, the tighter level is used instead (reducing risk). The predicted H/L can only tighten the SL — never widen it beyond `stop_loss_pips`. TP is always `actual_sl_pips × risk_reward`, so the R:R is respected and TP is never inflated beyond `stop_loss_pips × risk_reward`.
+
+For **IFVG signals**, TP is based on the FVG zone width (`gap_pips × risk_reward`) rather than `stop_loss_pips × risk_reward`. A fixed pip-based TP would be structurally disconnected from the gap and could leave an auto-executed trade open indefinitely; the gap width is the natural momentum measure. Position sizing risks exactly `risk_percent` of account balance. At confirm time, if no `lot_size` is provided, lot size is calculated from the live account balance and the signal's actual SL distance — so gold and other high-notional instruments are sized correctly rather than using a flat default.
+
+**Auto Close at Profit** (schedule field `auto_close_profit`): When `auto_execute=True`, enabling this option overrides the R:R-based TP. Instead, the TP price is recomputed so that hitting it yields exactly `auto_close_profit_amount` in account currency. The formula is `pips_needed = target_amount / (pip_value_per_lot × lot_size)`, then `TP = entry ± pips_needed × pip_size`. Live MT5 rates are used for pip value where available; the static fallback table is used otherwise. Requires `auto_execute=True` because lot size must be known at trade placement time.
 
 ### `news/calendar.py`
 Scrapes Forex Factory for upcoming events. Filters by currencies in the pair and a lookahead window. Returns event dicts with `time` (UTC), `currency`, `impact` (HIGH/MEDIUM/LOW), `name`, `forecast`, `previous`.
@@ -200,7 +214,7 @@ FastAPI app with a `lifespan` context manager that on startup: creates DB tables
 Pydantic v2 schemas for all request/response types.
 
 ### `backtest/runner.py`
-Async rolling-window backtester. `submit_run()` creates a `BacktestRun` DB record and fires an async background task. The task runs a 400-candle rolling window over historical MT5 data, calls Kronos on each window, applies filters, compares against actual closes, persists signal records in batches of 500, then aggregates metrics. Polls via `GET /backtest/{job_id}`.
+Async rolling-window backtester. `submit_run()` creates a `BacktestRun` DB record and fires an async background task. For **Kronos**, the task runs a 400-candle rolling window, calls the model on each window, applies filters, compares against actual closes, and persists signal records in batches of 500. For **IFVG**, outcome is determined by `_simulate_zone_excursion`: after each inversion candle, the next 10 candles are scanned for the highest high and lowest low; the excursion that extends furthest beyond the FVG zone boundary wins, and pips are measured from entry to that extreme point. Session labeling uses the matched session name from `check_session` directly, avoiding mis-labeling of candles in overlapping session windows (e.g. 07:00–09:00 UTC belongs to LONDON not TOKYO). Polls via `GET /backtest/{job_id}`.
 
 ### `backtest/metrics.py`
 Pure computation over backtest signal records. Produces: win rate, profit factor, Sharpe ratio (annualised for H1), max drawdown, directional accuracy, equity curve, breakdowns by session / confidence tier / news bias.
@@ -215,7 +229,7 @@ Pure computation over backtest signal records. Produces: win rate, profit factor
 | `POST` | `/signals/analyze` | Run full pipeline, return PENDING signal |
 | `GET`  | `/signals` | List all signals |
 | `GET`  | `/signals/{id}` | Get signal detail |
-| `POST` | `/signals/{id}/confirm` | Execute signal on MT5 |
+| `POST` | `/signals/{id}/confirm` | Execute signal on MT5 (body: `stack_count`, optional `lot_size`) |
 | `POST` | `/signals/{id}/reject` | Reject signal |
 
 ### Schedules

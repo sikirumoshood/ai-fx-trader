@@ -339,5 +339,69 @@ string Dispatch(string line)
       return "OK";
    }
 
+   //--- PENDING|SYMBOL|TYPE|VOLUME|PRICE|SL|TP|COMMENT
+   //    TYPE: BUY_LIMIT | SELL_LIMIT | BUY_STOP | SELL_STOP
+   if(cmd == "PENDING" && n >= 8)
+   {
+      MqlTradeRequest req = {};
+      MqlTradeResult  res = {};
+      req.action    = TRADE_ACTION_PENDING;
+      req.symbol    = parts[1];
+      req.volume    = StringToDouble(parts[3]);
+      req.price     = StringToDouble(parts[4]);
+      req.sl        = StringToDouble(parts[5]);
+      req.tp        = StringToDouble(parts[6]);
+      req.comment   = parts[7];
+      req.magic     = InpMagic;
+      req.type_time = ORDER_TIME_GTC;
+
+      string otype = parts[2];
+      if     (otype == "BUY_LIMIT")  req.type = ORDER_TYPE_BUY_LIMIT;
+      else if(otype == "SELL_LIMIT") req.type = ORDER_TYPE_SELL_LIMIT;
+      else if(otype == "BUY_STOP")   req.type = ORDER_TYPE_BUY_STOP;
+      else if(otype == "SELL_STOP")  req.type = ORDER_TYPE_SELL_STOP;
+      else return "ERR|Unknown pending order type: " + otype;
+
+      ZeroMemory(res);
+      if(!OrderSend(req, res) || res.retcode != TRADE_RETCODE_DONE)
+         return "ERR|" + IntegerToString(res.retcode) + ":" + res.comment;
+      return "OK|" + IntegerToString(res.order)
+               + "|" + DoubleToString(req.price, 8)
+               + "|" + DoubleToString(req.volume, 2);
+   }
+
+   //--- ORDERS  — return all pending (unfilled) orders placed by this EA
+   if(cmd == "ORDERS")
+   {
+      string r = "OK";
+      for(int i = 0; i < OrdersTotal(); i++)
+      {
+         ulong ticket = OrderGetTicket(i);
+         if(ticket == 0) continue;
+         if(!OrderSelect(ticket)) continue;
+         if((int)OrderGetInteger(ORDER_MAGIC) != InpMagic) continue;
+         r += "|" + IntegerToString(ticket)
+                + "," + OrderGetString(ORDER_SYMBOL)
+                + "," + IntegerToString((int)OrderGetInteger(ORDER_TYPE))
+                + "," + DoubleToString(OrderGetDouble(ORDER_VOLUME_INITIAL), 2)
+                + "," + DoubleToString(OrderGetDouble(ORDER_PRICE_OPEN), 8);
+      }
+      return r;
+   }
+
+   //--- CANCEL_PENDING|TICKET
+   if(cmd == "CANCEL_PENDING" && n >= 2)
+   {
+      ulong ticket = (ulong)StringToInteger(parts[1]);
+      MqlTradeRequest req = {};
+      MqlTradeResult  res = {};
+      req.action = TRADE_ACTION_REMOVE;
+      req.order  = ticket;
+      ZeroMemory(res);
+      if(!OrderSend(req, res) || res.retcode != TRADE_RETCODE_DONE)
+         return "ERR|" + IntegerToString(res.retcode) + ":" + res.comment;
+      return "OK";
+   }
+
    return "ERR|unknown command: " + cmd;
 }

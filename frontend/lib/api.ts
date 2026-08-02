@@ -22,9 +22,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 // ── Health ────────────────────────────────────────────────────────────────────
 import type {
-  Health, Signal, Trade, Schedule,
+  Health, Signal, Trade, Schedule, ConfirmResponse,
   AnalyzeRequest, CreateScheduleRequest, CreateTradeRequest,
   BacktestRequest, BacktestJob, BacktestResults,
+  JournalEntry, CreateJournalEntryRequest,
 } from "./types";
 
 export const api = {
@@ -37,7 +38,16 @@ export const api = {
     get:     (id: string) => request<Signal>(`/signals/${id}`),
     analyze: (body: AnalyzeRequest) =>
       request<Signal>("/signals/analyze", { method: "POST", body: JSON.stringify(body) }),
-    confirm: (id: string) => request<{ id: string; status: string; trade_id: string; executed_at: string }>(`/signals/${id}/confirm`, { method: "POST" }),
+    confirm: (id: string, stackCount = 1, lotSize?: number, stopLoss?: number, takeProfit?: number) =>
+      request<ConfirmResponse>(`/signals/${id}/confirm`, {
+        method: "POST",
+        body: JSON.stringify({
+          stack_count: stackCount,
+          ...(lotSize    != null && { lot_size:    lotSize }),
+          ...(stopLoss   != null && { stop_loss:   stopLoss }),
+          ...(takeProfit != null && { take_profit: takeProfit }),
+        }),
+      }),
     reject:  (id: string) => request<{ id: string; status: string }>(`/signals/${id}/reject`, { method: "POST" }),
   },
 
@@ -63,6 +73,19 @@ export const api = {
     modify: (id: string, body: { stop_loss?: number; take_profit?: number }) =>
       request<Trade>(`/trades/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
     close:  (id: string) => request<void>(`/trades/${id}`, { method: "DELETE" }),
+  },
+
+  // Journal
+  journal: {
+    list: (year?: number, month?: number) => {
+      const params = new URLSearchParams();
+      if (year  != null) params.set("year",  String(year));
+      if (month != null) params.set("month", String(month));
+      const qs = params.toString();
+      return request<JournalEntry[]>(`/journal${qs ? `?${qs}` : ""}`);
+    },
+    create: (body: CreateJournalEntryRequest) =>
+      request<JournalEntry>("/journal", { method: "POST", body: JSON.stringify(body) }),
   },
 
   // Backtest

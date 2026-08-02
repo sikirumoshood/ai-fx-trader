@@ -3,9 +3,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import datetime, timedelta, timezone
 
+import pandas as pd
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config.settings import pip_size
@@ -15,9 +15,9 @@ from data.store import (
     BacktestRun, BacktestPrediction, BacktestSignal, BacktestMetric,
     BacktestStatus, SignalDirection, NewsBias,
 )
-from model.base import BasePredictor
 from signals import filters, risk
 from signals.filters import identify_session
+from signals.fvg import detect_ifvg
 from backtest import metrics as metrics_mod
 
 log = logging.getLogger(__name__)
@@ -36,8 +36,9 @@ async def submit_run(
     risk_reward: float,
     risk_percent: float,
     initial_balance: float,
-    predictor: BasePredictor,
+    indicator: str = "ifvg",
     sessions: list[str] | None = None,
+    ifvg_threshold: float = 0.0,
 ) -> str:
     """Create a BacktestRun record and launch the backtest in the background.
 
@@ -57,25 +58,25 @@ async def submit_run(
             risk_reward=risk_reward,
             risk_percent=risk_percent,
             initial_balance=initial_balance,
+            indicator=indicator,
             sessions=sessions,
+            ifvg_threshold=ifvg_threshold,
             status=BacktestStatus.QUEUED,
         )
         db.add(run)
         await db.commit()
 
-    # Fire-and-forget — caller polls GET /backtest/{run_id}
     asyncio.create_task(
-        _run_backtest(
+        _run_backtest_ifvg(
             run_id=run_id,
             pair=pair,
             timeframe=timeframe,
             start_date=start_date,
             end_date=end_date,
-            min_pips=min_pips,
             stop_loss_pips=stop_loss_pips,
             risk_reward=risk_reward,
-            predictor=predictor,
             sessions=sessions,
+            ifvg_threshold=ifvg_threshold,
         )
     )
 
@@ -151,7 +152,7 @@ async def _run_backtest(
             confidence  = round(min(0.95, 0.5 + 0.5 * (pred_move / (atr + 1e-8))), 3)
 
             entry       = float(signal_candle["close"])
-            direction   = risk.resolve_direction(entry, next_candle["close"])
+            direction   = risk.resolve_direction(next_candle["open"], next_candle["close"])
             spread_pts  = float(signal_candle["spread"])
             spread_pips = spread_pts / 10.0  # 10 points = 1 pip for 5-digit brokers
 
@@ -164,7 +165,7 @@ async def _run_backtest(
             trend_ok, trend_direction, trend_detail = filters.check_trend_alignment(direction, context, pair)
             if not trend_ok:
                 reason = (
-                    f"Counter-trend prediction blocked: trend is {trend_direction}; Kronos predicted {direction}"
+                    f"Counter-trend prediction blocked: trend is {trend_direction}; signal was {direction}"
                     if trend_direction
                     else "Trend unavailable"
                 )
@@ -310,3 +311,198 @@ def _short_skip_reason(reason: Optional[str]) -> Optional[str]:
     if reason is None or len(reason) <= 64:
         return reason
     return reason[:61] + "..."
+
+
+# ── IFVG backtest ─────────────────────────────────────────────────────────────
+
+_MAX_FORWARD  = 10    # candles to scan forward for zone excursion measurement
+_FVG_LOOKBACK = 100   # candles to look back for open FVG zones
+
+
+async def _run_backtest_ifvg(
+    *,
+    run_id: str,
+    pair: str,
+    timeframe: str,
+    start_date: datetime,
+    end_date: datetime,
+    stop_loss_pips: float,
+    risk_reward: float,
+    sessions: list[str] | None = None,
+    ifvg_threshold: float = 0.0,
+) -> None:
+    await _set_status(run_id, BacktestStatus.RUNNING)
+    log.info("IFVG backtest %s started (%s %s %s→%s)", run_id, pair, timeframe, start_date.date(), end_date.date())
+
+    try:
+        # Fetch extra candles before start_date so FVG lookback has data
+        buffer_start = start_date - _tf_buffer(timeframe, _FVG_LOOKBACK)
+        all_candles = fetcher.fetch_ohlcv_range(pair, timeframe, buffer_start, end_date)
+        all_candles = all_candles.sort_values("time").reset_index(drop=True)
+        print(f"[IFVG {run_id}] fetched {len(all_candles)} candles "
+              f"from {all_candles['time'].iloc[0]} to {all_candles['time'].iloc[-1]}", flush=True)
+
+        # First index at or after start_date — this is where we begin emitting signals
+        start_ts = pd.Timestamp(start_date) if start_date.tzinfo else pd.Timestamp(start_date).tz_localize("UTC")
+        mask = all_candles["time"] >= start_ts
+        if not mask.any():
+            raise RuntimeError("No candles found at or after start_date")
+        start_idx = int(mask.idxmax())
+        print(f"[IFVG {run_id}] start_idx={start_idx}, signal bars={len(all_candles) - start_idx}, lookback={_FVG_LOOKBACK}", flush=True)
+
+        if start_idx < _FVG_LOOKBACK:
+            if len(all_candles) < _FVG_LOOKBACK + 1:
+                raise RuntimeError(
+                    f"Broker returned only {len(all_candles)} candles total — insufficient for {_FVG_LOOKBACK}-candle lookback."
+                )
+            log.warning(
+                "Broker has no M%s data before %s (earliest: %s). "
+                "Starting signals from bar %d (first bar with full lookback).",
+                timeframe, start_date.date(), all_candles["time"].iloc[0], _FVG_LOOKBACK,
+            )
+            start_idx = _FVG_LOOKBACK
+
+        ps = pip_size(pair)
+        print(f"[IFVG {run_id}] pip_size={ps} sessions={sessions} threshold={ifvg_threshold}", flush=True)
+
+        signal_records: list[dict] = []
+        n_no_ifvg = 0
+        n_timeout = 0
+        n_session_skip = 0
+
+        for i in range(start_idx, len(all_candles)):
+            await asyncio.sleep(0)   # yield to event loop on every bar
+
+            signal_candle = all_candles.iloc[i]
+            candle_time   = signal_candle["time"]
+            if hasattr(candle_time, "to_pydatetime"):
+                candle_time = candle_time.to_pydatetime()
+
+            # Session filter — always capture matched name for accurate labeling
+            in_session, matched_session = filters.check_session(candle_time, sessions=sessions)
+            if sessions and not in_session:
+                n_session_skip += 1
+                continue
+
+            # Lookback window ending at bar i (inclusive)
+            window = all_candles.iloc[i - _FVG_LOOKBACK: i + 1]
+            result = detect_ifvg(window, lookback=_FVG_LOOKBACK, threshold=ifvg_threshold)
+
+            if result is None:
+                n_no_ifvg += 1
+                continue
+
+            zone, direction = result
+            entry = float(signal_candle["close"])
+
+            # Scan forward up to _MAX_FORWARD candles and compare zone excursions
+            future  = all_candles.iloc[i + 1: i + 1 + _MAX_FORWARD]
+            outcome, actual_pips = _simulate_zone_excursion(direction, zone.min, zone.max, entry, future, pair)
+            print(f"[IFVG {run_id}] bar {i} {candle_time} {direction} entry={entry:.5f} zone=[{zone.min:.5f},{zone.max:.5f}] → {outcome} ({actual_pips:+.1f} pips)", flush=True)
+
+            if outcome == "TIMEOUT":
+                n_timeout += 1
+                continue
+
+            signal_records.append({
+                "direction":         direction,
+                "candle_time":       candle_time,
+                "effective_entry":   round(entry, 5),
+                "spread_pips":       0.0,
+                "predicted_close":   round(entry, 5),
+                "actual_close":      None,
+                "predicted_pips":    None,
+                "actual_pips":       actual_pips,
+                "direction_correct": actual_pips > 0,
+                "confidence":        1.0,
+                "news_bias":         None,
+                "session":           matched_session or identify_session(candle_time) or "OTHER",
+            })
+
+            if len(signal_records) % 500 == 0:
+                await _persist_signals(run_id, signal_records[-500:])
+
+        remainder = len(signal_records) % 500
+        if remainder:
+            await _persist_signals(run_id, signal_records[-remainder:])
+
+        print(f"[IFVG {run_id}] DONE: no_ifvg={n_no_ifvg} timeout={n_timeout} session_skip={n_session_skip} traded={len(signal_records)}", flush=True)
+
+        result_metrics = metrics_mod.compute(signal_records)
+        await _persist_metrics(run_id, result_metrics)
+        await _set_status(run_id, BacktestStatus.DONE)
+        log.info(
+            "IFVG backtest %s done — %d trades placed (%d WIN / %d LOSS)",
+            run_id,
+            result_metrics["traded"],
+            round(result_metrics["traded"] * result_metrics["win_rate"]),
+            round(result_metrics["traded"] * (1 - result_metrics["win_rate"])),
+        )
+        from notifications.telegram import send_backtest_alert
+        await send_backtest_alert(run_id, result_metrics)
+
+    except Exception as exc:
+        log.exception("IFVG backtest %s failed", run_id)
+        await _set_status(run_id, BacktestStatus.FAILED, error=str(exc))
+
+
+def _simulate_zone_excursion(
+    direction: str,
+    zone_min: float,
+    zone_max: float,
+    entry: float,
+    future_candles: pd.DataFrame,
+    pair: str,
+) -> tuple[str, float]:
+    """
+    Determine IFVG outcome by comparing max excursion above vs below the FVG zone.
+
+    Finds the highest high and lowest low across all forward candles, then measures
+    how far each moved beyond the zone boundary:
+      above_zone = max_high - zone_max  (distance above the top of the gap)
+      below_zone = zone_min - min_low   (distance below the bottom of the gap)
+
+    The larger excursion determines the directional outcome. Pips are measured
+    from entry to the extreme point in the winning direction.
+    """
+    if future_candles.empty:
+        return "TIMEOUT", 0.0
+
+    ps       = pip_size(pair)
+    max_high = float(future_candles["high"].max())
+    min_low  = float(future_candles["low"].min())
+
+    above_zone = max(max_high - zone_max, 0.0)
+    below_zone = max(zone_min - min_low, 0.0)
+
+    if direction == "SELL":
+        if below_zone >= above_zone:
+            return "WIN",  round((entry - min_low) / ps, 1)
+        else:
+            return "LOSS", round(-(max_high - entry) / ps, 1)
+    else:  # BUY
+        if above_zone >= below_zone:
+            return "WIN",  round((max_high - entry) / ps, 1)
+        else:
+            return "LOSS", round(-(entry - min_low) / ps, 1)
+
+
+def _tf_buffer(timeframe: str, n_candles: int) -> timedelta:
+    """Timedelta needed to cover n_candles of the given timeframe.
+
+    Minute timeframes get a minimum of 7 days so the buffer always spans at
+    least one full trading week, regardless of weekends or public holidays at
+    the start boundary (e.g. Jan 1 being a holiday with no M5 candles).
+    """
+    tf  = timeframe.upper()
+    pad = 1.4
+    if tf.startswith("M") and tf[1:].isdigit():
+        computed = timedelta(minutes=int(tf[1:]) * n_candles * pad)
+        return max(computed, timedelta(days=7))
+    if tf.startswith("H") and tf[1:].isdigit():
+        return timedelta(hours=int(tf[1:]) * n_candles * pad)
+    if tf == "D1":
+        return timedelta(days=int(n_candles * pad * 1.5))
+    if tf == "W1":
+        return timedelta(weeks=int(n_candles * pad))
+    return timedelta(days=30)

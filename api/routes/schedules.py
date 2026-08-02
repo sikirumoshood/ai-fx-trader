@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
+from datetime import timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.schemas import (
@@ -20,9 +22,26 @@ from data.store import (
     AsyncSessionLocal,
 )
 from scheduler import jobs
-from signals.engine import SignalEngine, SkipSignal
+from signals.fvg import FVGSignalEngine, SkipSignal
 
 router = APIRouter()
+
+_TF_MINUTES: dict[str, int] = {
+    "M1": 1, "M5": 5, "M15": 15, "M30": 30,
+    "H1": 60, "H4": 240, "D1": 1440, "W1": 10080,
+}
+
+def _tf_window_minutes(timeframe: str) -> int:
+    return _TF_MINUTES.get(timeframe.upper(), 60)
+
+# Per-pair lock: prevents concurrent schedules for the same pair from both
+# passing the dedup check before either has committed a trade to the DB.
+_pair_execution_locks: dict[str, asyncio.Lock] = {}
+
+def _pair_lock(pair: str) -> asyncio.Lock:
+    if pair not in _pair_execution_locks:
+        _pair_execution_locks[pair] = asyncio.Lock()
+    return _pair_execution_locks[pair]
 
 
 # ── POST /schedules ───────────────────────────────────────────────────────────
@@ -41,15 +60,23 @@ async def create_schedule(
         cron=req.cron,
         func=_run_scheduled_signal,
         kwargs={
-            "schedule_id":    schedule_id,
-            "pair":           req.pair.upper(),
-            "timeframe":      req.timeframe.upper(),
-            "min_pips":       req.min_pips,
-            "stop_loss_pips": req.stop_loss_pips,
-            "risk_reward":    req.risk_reward,
-            "risk_percent":   req.risk_percent,
-            "sessions":       req.sessions or None,
-            "notify":         req.notify,
+            "schedule_id":              schedule_id,
+            "pair":                     req.pair.upper(),
+            "timeframe":                req.timeframe.upper(),
+            "indicator":                req.indicator,
+            "min_pips":                 req.min_pips,
+            "stop_loss_pips":           req.stop_loss_pips,
+            "risk_reward":              req.risk_reward,
+            "risk_percent":             req.risk_percent,
+            "sessions":                 req.sessions or None,
+            "notify":                   req.notify,
+            "notify_email":             req.notify_email or None,
+            "ifvg_threshold":           req.ifvg_threshold,
+            "auto_execute":             req.auto_execute,
+            "auto_lot_size":            req.auto_lot_size,
+            "max_risk_amount":          req.max_risk_amount,
+            "auto_close_profit":        req.auto_close_profit,
+            "auto_close_profit_amount": req.auto_close_profit_amount,
         },
     )
 
@@ -58,12 +85,20 @@ async def create_schedule(
         pair=req.pair.upper(),
         timeframe=req.timeframe.upper(),
         cron=req.cron,
+        indicator=req.indicator,
         min_pips=req.min_pips,
         stop_loss_pips=req.stop_loss_pips,
         risk_reward=req.risk_reward,
         risk_percent=req.risk_percent,
         notify=req.notify,
+        notify_email=req.notify_email or None,
         sessions=req.sessions or None,
+        ifvg_threshold=req.ifvg_threshold,
+        auto_execute=req.auto_execute,
+        auto_lot_size=req.auto_lot_size,
+        max_risk_amount=req.max_risk_amount,
+        auto_close_profit=req.auto_close_profit,
+        auto_close_profit_amount=req.auto_close_profit_amount,
         status=ScheduleStatus.ACTIVE,
         next_run=next_run,
         created_at=now,
@@ -144,8 +179,29 @@ async def update_schedule(
     if req.notify is not None:
         sched.notify = req.notify
         should_refresh_job = True
+    if req.notify_email is not None:
+        sched.notify_email = req.notify_email or None
+        should_refresh_job = True
     if req.sessions is not None:
         sched.sessions = req.sessions or None
+        should_refresh_job = True
+    if req.ifvg_threshold is not None:
+        sched.ifvg_threshold = req.ifvg_threshold
+        should_refresh_job = True
+    if req.auto_execute is not None:
+        sched.auto_execute = req.auto_execute
+        should_refresh_job = True
+    if req.auto_lot_size is not None:
+        sched.auto_lot_size = req.auto_lot_size
+        should_refresh_job = True
+    if req.max_risk_amount is not None:
+        sched.max_risk_amount = req.max_risk_amount
+        should_refresh_job = True
+    if req.auto_close_profit is not None:
+        sched.auto_close_profit = req.auto_close_profit
+        should_refresh_job = True
+    if req.auto_close_profit_amount is not None:
+        sched.auto_close_profit_amount = req.auto_close_profit_amount
         should_refresh_job = True
 
     if req.cron is not None:
@@ -225,12 +281,19 @@ async def _run_scheduled_signal(
     stop_loss_pips: float,
     risk_reward: float,
     risk_percent: float,
+    indicator: str = "ifvg",
     sessions: list[str] | None = None,
     notify: bool = False,
+    notify_email: str | None = None,
+    ifvg_threshold: float = 0.0,
+    auto_execute: bool = False,
+    auto_lot_size: float | None = None,
+    max_risk_amount: float | None = None,
+    auto_close_profit: bool = False,
+    auto_close_profit_amount: float | None = None,
 ) -> None:
     """Called by APScheduler on each cron tick."""
     import logging
-    from api.server import app
 
     log = logging.getLogger(__name__)
     audit_log = logging.getLogger("schedule.execution")
@@ -240,61 +303,120 @@ async def _run_scheduled_signal(
     signal_id: str | None = None
 
     audit_log.info(
-        "run.start schedule_id=%s pair=%s timeframe=%s cron_tick=%s",
+        "run.start schedule_id=%s pair=%s timeframe=%s indicator=%s cron_tick=%s",
         schedule_id,
         pair,
         timeframe,
+        indicator,
         started_at.isoformat(),
     )
-    engine: SignalEngine = getattr(app.state, "signal_engine", None)
-    if engine is None:
-        log.warning("Scheduled run %s: signal engine not available", schedule_id)
-        outcome = "FAILED"
-        detail = "signal engine not available"
-    else:
+
+    try:
+        fvg_engine = FVGSignalEngine()
+        result = await fvg_engine.generate(
+            pair=pair,
+            timeframe=timeframe,
+            stop_loss_pips=stop_loss_pips,
+            risk_reward=risk_reward,
+            risk_percent=risk_percent,
+            threshold=ifvg_threshold,
+            sessions=sessions,
+        )
+    except Exception as exc:
+        detail = str(exc)
+        log.exception("Schedule %s failed during engine dispatch", schedule_id)
+        result = None
+
+    if result is not None:
         try:
-            result = await engine.generate(
-                pair=pair,
-                timeframe=timeframe,
-                min_pips=min_pips,
-                stop_loss_pips=stop_loss_pips,
-                risk_reward=risk_reward,
-                risk_percent=risk_percent,
-                sessions=sessions,
-            )
             if isinstance(result, SkipSignal):
-                outcome = "SKIPPED"
+                outcome = getattr(result, "code", "SKIPPED")
                 detail = result.reason
-                log.info("Schedule %s → SKIP (%s)", schedule_id, result.reason)
+                log.info("Schedule %s → %s (%s)", schedule_id, outcome, result.reason)
             else:
-                outcome = "SUCCESS"
-                detail = f"{pair} {timeframe} {result.direction}"
-                signal_id = result.id
-                log.info("Schedule %s → %s %s %s", schedule_id, pair, timeframe, result.direction)
-                async with AsyncSessionLocal() as db:
-                    sig = DBSignal(
-                        id=result.id,
-                        status=SignalStatus.PENDING,
-                        direction=SignalDirection(result.direction),
-                        pair=result.pair,
-                        timeframe=result.timeframe,
-                        entry=result.entry,
-                        stop_loss=result.stop_loss,
-                        take_profit=result.take_profit,
-                        risk_reward=result.risk_reward,
-                        confidence=result.confidence,
-                        news_bias=NewsBias(result.news_bias) if result.news_bias else None,
-                        reason=result.reason,
-                        expires_at=result.expires_at,
-                        created_at=result.created_at,
-                    )
-                    db.add(sig)
-                    await db.commit()
-                if notify:
-                    from notifications.telegram import send_signal_alert
-                    await send_signal_alert(result)
+                async with _pair_lock(pair):
+                    # Dedup: skip if a signal for this pair+timeframe already exists within the TF window.
+                    # Lock ensures concurrent schedules for the same pair are serialized so the
+                    # check-then-act is atomic — prevents all of them passing before any commits.
+                    is_duplicate = False
+                    window_minutes = _tf_window_minutes(timeframe)
+                    window_start = started_at - timedelta(minutes=window_minutes)
+                    async with AsyncSessionLocal() as check_db:
+                        existing = await check_db.execute(
+                            select(DBSignal)
+                            .where(
+                                DBSignal.pair == pair,
+                                DBSignal.timeframe == timeframe,
+                                DBSignal.created_at >= window_start,
+                                DBSignal.status.in_([SignalStatus.PENDING, SignalStatus.EXECUTED]),
+                            )
+                            .limit(1)
+                        )
+                        if existing.scalar_one_or_none() is not None:
+                            is_duplicate = True
+                            outcome = "SKIPPED"
+                            detail = f"Duplicate signal within {window_minutes}m TF window"
+                            log.info("Schedule %s → SKIP (duplicate within %dm)", schedule_id, window_minutes)
+
+                    if not is_duplicate:
+                        outcome = "SUCCESS"
+                        detail = f"{pair} {timeframe} {result.direction}"
+                        log.info("Schedule %s → %s %s %s", schedule_id, pair, timeframe, result.direction)
+
+                        if auto_execute:
+                            saved_id = await _auto_execute_signal(
+                                result=result,
+                                risk_percent=risk_percent,
+                                auto_lot_size=auto_lot_size,
+                                max_risk_amount=max_risk_amount,
+                                auto_close_profit=auto_close_profit,
+                                auto_close_profit_amount=auto_close_profit_amount,
+                                risk_reward=risk_reward,
+                                schedule_id=schedule_id,
+                                notify_email=notify_email,
+                                log=log,
+                            )
+                            if saved_id is None:
+                                # Guard tripped (duplicate pending or position limit) — downgrade to SKIPPED
+                                outcome = "SKIPPED"
+                                detail = f"{pair} {timeframe} {result.direction} — blocked by open position/pending order limit"
+                            signal_id = saved_id
+                        else:
+                            async with AsyncSessionLocal() as db:
+                                sig = DBSignal(
+                                    id=result.id,
+                                    status=SignalStatus.PENDING,
+                                    direction=SignalDirection(result.direction),
+                                    pair=result.pair,
+                                    timeframe=result.timeframe,
+                                    entry=result.entry,
+                                    order_type=result.order_type,
+                                    stop_loss=stop_loss,
+                                    take_profit=result.take_profit,
+                                    risk_reward=result.risk_reward,
+                                    confidence=result.confidence,
+                                    news_bias=NewsBias(result.news_bias) if result.news_bias else None,
+                                    rsi=result.rsi_value,
+                                    rsi_advisory=result.rsi_advisory,
+                                    pattern_name=result.pattern_name,
+                                    pattern_bias=result.pattern_bias,
+                                    reason=result.reason,
+                                    expires_at=result.expires_at,
+                                    created_at=result.created_at,
+                                )
+                                db.add(sig)
+                                await db.commit()
+                            signal_id = result.id
+
+                            if notify:
+                                from notifications.telegram import send_signal_alert
+                                await send_signal_alert(result)
+                            if notify_email:
+                                from notifications.email import send_signal_email
+                                await send_signal_email(result, notify_email)
         except Exception as exc:
             detail = str(exc)
+            signal_id = None  # signal may not have been committed — don't reference it
             log.exception("Schedule %s failed", schedule_id)
 
     completed_at = datetime.now(timezone.utc)
@@ -329,6 +451,199 @@ async def _run_scheduled_signal(
     )
 
 
+# ── Auto-execution helper ─────────────────────────────────────────────────────
+
+async def _auto_execute_signal(
+    result,
+    risk_percent: float,
+    auto_lot_size: float | None,
+    max_risk_amount: float | None,
+    schedule_id: str,
+    log,
+    notify_email: str | None = None,
+    auto_close_profit: bool = False,
+    auto_close_profit_amount: float | None = None,
+    risk_reward: float = 1.0,
+) -> str | None:
+    """Place MT5 order and save signal. Returns signal_id if committed, None if skipped."""
+    import uuid as _uuid
+    from data.store import Trade as DBTrade
+    from config.settings import DEFAULT_LOT_SIZE, pip_size, price_decimals
+    from signals.risk import calculate_lot_size, calculate_lot_size_from_amount, _live_pip_value_per_lot, _PIP_VALUE_PER_LOT, _DEFAULT_PIP_VALUE
+    from execution import trader
+
+    now = datetime.now(timezone.utc)
+
+    # For limit orders: skip if a pending (unfilled) limit order already exists on
+    # MT5 for this pair. Check MT5 directly — not the DB — so stale DB records
+    # never block new trades.
+    if getattr(result, "order_type", "MARKET") == "LIMIT":
+        try:
+            pending_on_mt5 = trader.get_pending_orders(pair=result.pair)
+            if pending_on_mt5:
+                log.info(
+                    "Schedule %s: %d pending limit order(s) already on MT5 for %s — skipping",
+                    schedule_id, len(pending_on_mt5), result.pair,
+                )
+                return None
+        except Exception as exc:
+            log.warning("Schedule %s: could not check MT5 pending orders: %s", schedule_id, exc)
+
+    # Hard stop: never place more than 2 open positions per pair at any time.
+    try:
+        open_positions = trader.get_open_positions(pair=result.pair)
+        if len(open_positions) >= 2:
+            log.info(
+                "Schedule %s: %d open position(s) already exist for %s — skipping",
+                schedule_id, len(open_positions), result.pair,
+            )
+            return None
+    except Exception as exc:
+        log.warning("Schedule %s: could not check open positions: %s", schedule_id, exc)
+
+    if auto_lot_size is not None:
+        lot_size = auto_lot_size
+    elif max_risk_amount is not None and result.stop_loss is not None:
+        try:
+            sl_pips = abs(result.entry - result.stop_loss) / pip_size(result.pair)
+            lot_size = calculate_lot_size_from_amount(max_risk_amount, sl_pips, result.pair)
+        except Exception:
+            lot_size = DEFAULT_LOT_SIZE
+    else:
+        try:
+            from data import fetcher
+            balance = fetcher.get_account_balance() or 0.0
+            if balance > 0 and result.stop_loss is not None:
+                sl_pips = abs(result.entry - result.stop_loss) / pip_size(result.pair)
+                lot_size = calculate_lot_size(balance, risk_percent, sl_pips, result.pair)
+            else:
+                lot_size = DEFAULT_LOT_SIZE
+        except Exception:
+            lot_size = DEFAULT_LOT_SIZE
+
+    # Recompute TP and SL in dollar terms when auto_close_profit is active.
+    take_profit = result.take_profit
+    stop_loss   = result.stop_loss
+    if auto_close_profit and auto_close_profit_amount and lot_size > 0:
+        try:
+            pip_val  = _live_pip_value_per_lot(result.pair) or _PIP_VALUE_PER_LOT.get(result.pair.upper(), _DEFAULT_PIP_VALUE)
+            ps       = pip_size(result.pair)
+            decimals = price_decimals(result.pair)
+
+            tp_pips = auto_close_profit_amount / (pip_val * lot_size)
+            if result.direction == "BUY":
+                take_profit = round(result.entry + tp_pips * ps, decimals)
+            else:
+                take_profit = round(result.entry - tp_pips * ps, decimals)
+            log.info(
+                "Schedule %s auto_close_profit: target=$%.2f lot=%.2f pip_val=%.4f → TP=%s (%.1f pips)",
+                schedule_id, auto_close_profit_amount, lot_size, pip_val, take_profit, tp_pips,
+            )
+
+            effective_risk = max_risk_amount if max_risk_amount else auto_close_profit_amount / max(risk_reward, 0.1)
+            sl_pips = effective_risk / (pip_val * lot_size)
+            if result.direction == "BUY":
+                stop_loss = round(result.entry - sl_pips * ps, decimals)
+            else:
+                stop_loss = round(result.entry + sl_pips * ps, decimals)
+            source = "max_risk_amount" if max_risk_amount else f"TP/R:R ({auto_close_profit_amount}/{risk_reward})"
+            log.info(
+                "Schedule %s auto_close_profit SL: risk=$%.2f (from %s) lot=%.2f → SL=%s (%.1f pips)",
+                schedule_id, effective_risk, source, lot_size, stop_loss, sl_pips,
+            )
+        except Exception as exc:
+            log.warning("Schedule %s: could not recompute TP/SL for auto_close_profit: %s", schedule_id, exc)
+
+    # Place 2 orders per signal
+    orders: list[dict] = []
+    for _ in range(2):
+        try:
+            if getattr(result, "order_type", "MARKET") == "LIMIT":
+                order = trader.place_pending_order(
+                    pair=result.pair,
+                    direction=result.direction,
+                    order_type="LIMIT",
+                    entry=result.entry,
+                    lot_size=lot_size,
+                    stop_loss=stop_loss,
+                    take_profit=take_profit,
+                    signal_id=result.id,
+                )
+            else:
+                order = trader.place_order(
+                    pair=result.pair,
+                    direction=result.direction,
+                    lot_size=lot_size,
+                    stop_loss=stop_loss,
+                    take_profit=take_profit,
+                    signal_id=result.id,
+                )
+            orders.append(order)
+            log.info("Schedule %s auto-executed → ticket=%s lot=%.2f", schedule_id, order["ticket"], lot_size)
+        except Exception as exc:
+            log.error("Schedule %s auto-execution order failed: %s", schedule_id, exc)
+
+    # Pre-generate trade IDs so Signal.trade_id and Trade.id reference the same value.
+    trade_ids = [f"trd_{_uuid.uuid4().hex[:10]}" for _ in orders]
+
+    if orders and notify_email:
+        from notifications.email import send_signal_email
+        await send_signal_email(result, notify_email)
+
+    async with AsyncSessionLocal() as db:
+        # Insert signal with trade_id=None first to break the circular FK:
+        # signals.trade_id → trades.id  and  trades.signal_id → signals.id
+        sig = DBSignal(
+            id=result.id,
+            status=SignalStatus.EXECUTED if orders else SignalStatus.PENDING,
+            direction=SignalDirection(result.direction),
+            pair=result.pair,
+            timeframe=result.timeframe,
+            entry=result.entry,
+            order_type=result.order_type,
+            stop_loss=stop_loss,
+            take_profit=take_profit,
+            risk_reward=result.risk_reward,
+            confidence=result.confidence,
+            news_bias=NewsBias(result.news_bias) if result.news_bias else None,
+            rsi=result.rsi_value,
+            rsi_advisory=result.rsi_advisory,
+            pattern_name=result.pattern_name,
+            pattern_bias=result.pattern_bias,
+            reason=result.reason,
+            expires_at=result.expires_at,
+            created_at=result.created_at,
+            executed_at=now if orders else None,
+            trade_id=None,
+        )
+        db.add(sig)
+        await db.flush()  # signal row now exists — trades can safely reference it
+
+        for i, (order, trade_id) in enumerate(zip(orders, trade_ids)):
+            db.add(DBTrade(
+                id=trade_id,
+                signal_id=result.id,
+                stack_index=i,
+                mt5_ticket=order["ticket"],
+                pair=result.pair,
+                direction=SignalDirection(result.direction),
+                order_type=result.order_type,
+                entry=result.entry,
+                stop_loss=result.stop_loss,
+                take_profit=take_profit,
+                lot_size=lot_size,
+                open_price=order["price"],
+                status="EXECUTED",
+                opened_at=now,
+            ))
+
+        await db.flush()  # trades now exist — safe to set signal.trade_id
+        sig.trade_id = trade_ids[0] if trade_ids else None
+        await db.commit()
+
+    return result.id if orders else None
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 async def _get_active_schedule(schedule_id: str, db: AsyncSession) -> DBSchedule:
@@ -352,15 +667,23 @@ async def _sync_next_runs(db: AsyncSession) -> None:
 
 def _job_kwargs(sched: DBSchedule) -> dict:
     return {
-        "schedule_id":    sched.id,
-        "pair":           sched.pair,
-        "timeframe":      sched.timeframe,
-        "min_pips":       sched.min_pips,
-        "stop_loss_pips": sched.stop_loss_pips,
-        "risk_reward":    sched.risk_reward,
-        "risk_percent":   sched.risk_percent,
-        "sessions":       sched.sessions,
-        "notify":         sched.notify,
+        "schedule_id":              sched.id,
+        "pair":                     sched.pair,
+        "timeframe":                sched.timeframe,
+        "indicator":                sched.indicator,
+        "min_pips":                 sched.min_pips,
+        "stop_loss_pips":           sched.stop_loss_pips,
+        "risk_reward":              sched.risk_reward,
+        "risk_percent":             sched.risk_percent,
+        "sessions":                 sched.sessions,
+        "notify":                   sched.notify,
+        "notify_email":             sched.notify_email,
+        "ifvg_threshold":           sched.ifvg_threshold or 0.0,
+        "auto_execute":             sched.auto_execute or False,
+        "auto_lot_size":            sched.auto_lot_size,
+        "max_risk_amount":          sched.max_risk_amount,
+        "auto_close_profit":        sched.auto_close_profit or False,
+        "auto_close_profit_amount": sched.auto_close_profit_amount,
     }
 
 
@@ -371,12 +694,20 @@ def _to_response(sched: DBSchedule) -> ScheduleResponse:
         pair=sched.pair,
         timeframe=sched.timeframe,
         cron=sched.cron,
+        indicator=sched.indicator or "ifvg",
         min_pips=sched.min_pips,
         stop_loss_pips=sched.stop_loss_pips,
         risk_reward=sched.risk_reward,
         risk_percent=sched.risk_percent,
         notify=sched.notify,
+        notify_email=sched.notify_email,
         sessions=sched.sessions,
+        ifvg_threshold=sched.ifvg_threshold or 0.0,
+        auto_execute=sched.auto_execute or False,
+        auto_lot_size=sched.auto_lot_size,
+        max_risk_amount=sched.max_risk_amount,
+        auto_close_profit=sched.auto_close_profit or False,
+        auto_close_profit_amount=sched.auto_close_profit_amount,
         next_run=sched.next_run,
         created_at=sched.created_at,
     )

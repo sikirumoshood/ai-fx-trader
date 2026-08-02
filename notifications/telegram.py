@@ -76,5 +76,5 @@ async def _send(text: str) -> None:
                 },
             )
             resp.raise_for_status()
-    except Exception as exc:
-        log.error("Telegram alert failed: %s", exc)
+    except Exception:
+        log.exception("Telegram alert failed")

@@ -17,38 +17,73 @@ router = APIRouter()
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=TradeResponse)
 async def create_trade(req: CreateTradeRequest, db: AsyncSession = Depends(get_db)):
-    direction = req.direction.upper()
+    direction  = req.direction.upper()
+    order_type = req.order_type.upper()
     if direction not in ("BUY", "SELL"):
         raise HTTPException(status_code=422, detail="direction must be BUY or SELL")
 
     from execution import trader
 
-    try:
-        order = trader.place_order(
-            pair=req.pair.upper(),
-            direction=direction,
-            lot_size=req.lot_size,
+    now       = datetime.now(timezone.utc)
+    signal_id = f"manual_{uuid.uuid4().hex[:10]}"
+    pair      = req.pair.upper()
+
+    if order_type == "MARKET":
+        try:
+            order = trader.place_order(
+                pair=pair,
+                direction=direction,
+                lot_size=req.lot_size,
+                stop_loss=req.stop_loss,
+                take_profit=req.take_profit,
+                signal_id=signal_id,
+            )
+        except RuntimeError as exc:
+            raise HTTPException(status_code=502, detail=f"MT5 order failed: {exc}")
+
+        trade = DBTrade(
+            id=f"trd_{uuid.uuid4().hex[:10]}",
+            mt5_ticket=order["ticket"],
+            pair=pair,
+            direction=SignalDirection(direction),
+            order_type="MARKET",
+            entry=order["price"],
             stop_loss=req.stop_loss,
             take_profit=req.take_profit,
-            signal_id=f"manual_{uuid.uuid4().hex[:10]}",
+            lot_size=req.lot_size,
+            open_price=order["price"],
+            status="OPEN",
+            opened_at=now,
         )
-    except RuntimeError as exc:
-        raise HTTPException(status_code=502, detail=f"MT5 order failed: {exc}")
+    else:
+        try:
+            order = trader.place_pending_order(
+                pair=pair,
+                direction=direction,
+                order_type=order_type,
+                entry=req.entry,
+                lot_size=req.lot_size,
+                stop_loss=req.stop_loss,
+                take_profit=req.take_profit,
+                signal_id=signal_id,
+            )
+        except RuntimeError as exc:
+            raise HTTPException(status_code=502, detail=f"MT5 pending order failed: {exc}")
 
-    now = datetime.now(timezone.utc)
-    trade = DBTrade(
-        id=f"trd_{uuid.uuid4().hex[:10]}",
-        mt5_ticket=order["ticket"],
-        pair=req.pair.upper(),
-        direction=SignalDirection(direction),
-        entry=order["price"],
-        stop_loss=req.stop_loss,
-        take_profit=req.take_profit,
-        lot_size=req.lot_size,
-        open_price=order["price"],
-        status="OPEN",
-        opened_at=now,
-    )
+        trade = DBTrade(
+            id=f"trd_{uuid.uuid4().hex[:10]}",
+            mt5_ticket=order["ticket"],
+            pair=pair,
+            direction=SignalDirection(direction),
+            order_type=order_type,
+            entry=req.entry,
+            stop_loss=req.stop_loss,
+            take_profit=req.take_profit,
+            lot_size=req.lot_size,
+            status="PENDING",
+            opened_at=now,
+        )
+
     db.add(trade)
     await db.commit()
     await db.refresh(trade)
@@ -109,21 +144,30 @@ async def close_trade(trade_id: str, db: AsyncSession = Depends(get_db)):
     trade = await _get_open_trade(trade_id, db)
 
     from execution import trader
-    try:
-        result = trader.close_trade(ticket=trade.mt5_ticket)
-    except RuntimeError as exc:
-        raise HTTPException(status_code=502, detail=f"MT5 close failed: {exc}")
 
-    trade.close_price = result["close_price"]
-    trade.status      = "CLOSED"
-    trade.closed_at   = datetime.now(timezone.utc)
-
-    from config.settings import pip_size
-    ps = pip_size(trade.pair)
-    if trade.direction.value == "BUY":
-        trade.profit_pips = (result["close_price"] - trade.open_price) / ps
+    if trade.status == "PENDING":
+        try:
+            trader.cancel_pending_order(ticket=trade.mt5_ticket)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=502, detail=f"MT5 cancel failed: {exc}")
+        trade.status    = "CANCELED"
+        trade.closed_at = datetime.now(timezone.utc)
     else:
-        trade.profit_pips = (trade.open_price - result["close_price"]) / ps
+        try:
+            result = trader.close_trade(ticket=trade.mt5_ticket)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=502, detail=f"MT5 close failed: {exc}")
+
+        trade.close_price = result["close_price"]
+        trade.status      = "CLOSED"
+        trade.closed_at   = datetime.now(timezone.utc)
+
+        from config.settings import pip_size
+        ps = pip_size(trade.pair)
+        if trade.direction.value == "BUY":
+            trade.profit_pips = (result["close_price"] - trade.open_price) / ps
+        else:
+            trade.profit_pips = (trade.open_price - result["close_price"]) / ps
 
     await db.commit()
 
@@ -134,8 +178,8 @@ async def _get_open_trade(trade_id: str, db: AsyncSession) -> DBTrade:
     trade = await db.get(DBTrade, trade_id)
     if trade is None:
         raise HTTPException(status_code=404, detail="Trade not found")
-    if trade.status != "OPEN":
-        raise HTTPException(status_code=409, detail=f"Trade is {trade.status}, not OPEN")
+    if trade.status not in ("OPEN", "PENDING"):
+        raise HTTPException(status_code=409, detail=f"Trade is {trade.status}, not OPEN or PENDING")
     if trade.mt5_ticket is None:
         raise HTTPException(status_code=409, detail="Trade has no MT5 ticket")
     return trade
@@ -147,6 +191,7 @@ def _to_response(trade: DBTrade) -> TradeResponse:
         mt5_ticket=trade.mt5_ticket,
         pair=trade.pair,
         direction=trade.direction.value,
+        order_type=trade.order_type or "MARKET",
         entry=trade.entry,
         stop_loss=trade.stop_loss,
         take_profit=trade.take_profit,

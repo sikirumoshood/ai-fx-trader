@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, TrendingUp, Calendar, Briefcase,
-  FlaskConical, Activity,
+  FlaskConical, BookOpen,
 } from "lucide-react";
 
 const links = [
@@ -14,6 +14,7 @@ const links = [
   { href: "/schedules",  label: "Schedules",  icon: Calendar },
   { href: "/trades",     label: "Trades",     icon: Briefcase },
   { href: "/backtest",   label: "Backtest",   icon: FlaskConical },
+  { href: "/journal",    label: "Journal",    icon: BookOpen },
 ];
 
 export function Sidebar() {

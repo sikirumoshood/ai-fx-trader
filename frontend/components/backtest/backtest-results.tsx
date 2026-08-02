@@ -130,14 +130,23 @@ export function BacktestResults({ jobId }: { jobId: string }) {
       <div className="flex flex-wrap gap-x-6 gap-y-1 rounded-md border border-border bg-muted/30 px-4 py-3 text-sm">
         <span><span className="text-muted-foreground">Pair: </span><strong>{job.pair}</strong></span>
         <span><span className="text-muted-foreground">TF: </span><strong>{job.timeframe}</strong></span>
+        {job.indicator && (
+          <span><span className="text-muted-foreground">Indicator: </span><strong>{job.indicator.toUpperCase()}</strong></span>
+        )}
         {job.start_date && job.end_date && (
           <span>
             <span className="text-muted-foreground">Range: </span>
             <strong>{String(job.start_date).slice(0, 10)} → {String(job.end_date).slice(0, 10)}</strong>
           </span>
         )}
-        {job.min_pips != null && (
-          <span><span className="text-muted-foreground">Min pips: </span><strong>{job.min_pips}</strong></span>
+        {job.indicator === "ifvg" ? (
+          job.ifvg_threshold != null && job.ifvg_threshold > 0 && (
+            <span><span className="text-muted-foreground">Gap threshold: </span><strong>{job.ifvg_threshold}</strong></span>
+          )
+        ) : (
+          job.min_pips != null && (
+            <span><span className="text-muted-foreground">Min pips: </span><strong>{job.min_pips}</strong></span>
+          )
         )}
         {job.stop_loss_pips != null && (
           <span><span className="text-muted-foreground">SL: </span><strong>{job.stop_loss_pips} pips</strong></span>
