@@ -8,6 +8,8 @@ venv/
 dist/
 build/
 frontend/.next/
+frontend/node_modules/
+vendor/
 .pytest_cache/
 .mypy_cache/
 whatsapp/session/
